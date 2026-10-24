@@ -70,7 +70,7 @@
   function splitTitle(raw) {
     let msrp = '';
     let title = raw.replace(/^Lot\s+\S+\s*-\s*/i, '').replace(/^DSM-\s*/, '');
-    title = title.replace(/\s*MSRP:?\s*\$?\s*([\d,]+(?:\.\d+)?)\s*$/i, (_, v) => { msrp = money(v); return ''; });
+    title = title.replace(/[\s,\-–]*\bM(?:SR|RS)P\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)?\s*$/i, (_, v) => { if (v) msrp = money(v); return ''; });
     return { title: title.trim() || raw, msrp };
   }
 
