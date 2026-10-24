@@ -21,5 +21,11 @@
       "js": ["styles.js", "app.js"],
       "run_at": "document_end"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon16.png", "icons/icon32.png"],
+      "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"]
+    }
   ]
 }
