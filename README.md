@@ -3,7 +3,7 @@
 A Chrome extension that replaces the nativebid.com interface with a clean, image-first layout. Not affiliated with NativeBid Auction Services.
 
 - Large-photo grid for search, category, and auction pages, with full titles and infinite scrolling
-- Lot pages with a swipeable photo gallery, live price and countdown, and inline bidding that hands off to NativeBid's own confirmation page
+- Lot pages with a swipeable photo gallery, live price and countdown, a clear winning/outbid banner, and two-tap inline bidding that shows NativeBid's fees before you confirm
 - Minimal header with a text logo, search, and category menu
 - A footer link switches back to the classic layout at any time
 

@@ -1,6 +1,6 @@
 # Privacy Policy — NativeBid Modern
 
-Last updated: October 23, 2026
+Last updated: October 24, 2026
 
 This Chrome extension provides an alternative interface for nativebid.com. It is not affiliated with or endorsed by NativeBid Auction Services.
 
@@ -13,7 +13,7 @@ The extension does not collect, store, transmit, sell, or share any personal or 
 - It runs only on nativebid.com.
 - It reads the content of the NativeBid pages you visit and displays it in a different layout, entirely within your browser.
 - To load more search results as you scroll, it requests additional result pages directly from nativebid.com, the same requests the site itself makes.
-- Bids are submitted through NativeBid's own confirmation page. The extension never sees or handles your password or payment details.
+- When you place a bid, it sends the bid to nativebid.com using NativeBid's own confirmation and bidding requests, with your existing NativeBid sign-in. It shows NativeBid's fee summary first and only places the bid when you tap to confirm. The extension never sees or handles your password or payment details.
 
 ## Local storage
 
