@@ -638,11 +638,17 @@
       priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : 'Final price';
       bidsEl.textContent = state.bids ? `${state.bids} bid${state.bids === '1' ? '' : 's'}` : '';
       reserveEl.textContent = state.reserve;
-      mineEl.textContent = state.max ? `Your max bid is ${money(state.max)}` : '';
-      mineEl.classList.toggle('hidden', !state.max);
-      noticeEl.textContent = state.notice;
-      noticeEl.classList.toggle('hidden', !state.notice);
-      quick.textContent = buttonLabel(quick, state.min ? `Bid ${money(state.min)}` : 'Bid');
+      const tone = /not the high bidder|not currently winning|did not win|beating your/i.test(state.notice) ? 'losing'
+        : /currently winning|have won/i.test(state.notice) ? 'winning' : '';
+      const maxLine = state.max ? `Your max bid is ${money(state.max)}` : '';
+      noticeEl.className = 'banner ' + (tone || 'neutral') + (state.notice ? '' : ' hidden');
+      noticeEl.replaceChildren(
+        tone && svg(tone === 'winning' ? 'M20 6L9 17l-5-5' : 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'),
+        h('div', null, state.notice, maxLine && h('small', null, maxLine)));
+      mineEl.textContent = maxLine;
+      mineEl.classList.toggle('hidden', !maxLine || !!state.notice);
+      quick.textContent = buttonLabel(quick, !state.min ? 'Bid' : tone === 'winning' ? `Raise max to ${money(state.min)}` : `Bid ${money(state.min)}`);
+      quick.classList.toggle('primary', tone !== 'winning');
       quick.classList.toggle('armed', pending?.btn === quick && !pending.loading);
       maxBtn.textContent = buttonLabel(maxBtn, 'Set max bid');
       maxBtn.classList.toggle('armed', pending?.btn === maxBtn && !pending.loading);

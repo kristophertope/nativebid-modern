@@ -13,6 +13,9 @@ globalThis.NBX_CSS = `
   --accent-ink: #ffffff;
   --accent-soft: #e3f2ef;
   --warn: #c2410c;
+  --warn-ink: #ffffff;
+  --win: #15803d;
+  --win-ink: #ffffff;
   --radius: 14px;
   background: var(--bg);
   color: var(--ink);
@@ -31,6 +34,9 @@ globalThis.NBX_CSS = `
     --accent-ink: #062320;
     --accent-soft: #12302c;
     --warn: #fb923c;
+    --warn-ink: #1f0d02;
+    --win: #22c55e;
+    --win-ink: #052e16;
   }
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -212,10 +218,16 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .big { font-size: 42px; font-weight: 750; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .link { color: var(--accent); font-weight: 600; }
 .mine { padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; font-weight: 700; line-height: 1.3; }
+.banner svg { flex: 0 0 24px; width: 24px; height: 24px; stroke-width: 2.6; }
+.banner small { display: block; margin-top: 2px; font-size: 13px; font-weight: 500; opacity: .88; }
+.banner.neutral { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.banner.winning { background: var(--win); color: var(--win-ink); }
+.banner.losing { background: var(--warn); color: var(--warn-ink); }
 .btn { height: 50px; padding: 0 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-weight: 650; cursor: pointer; transition: background .15s, transform .1s; }
 .btn:active { transform: scale(.985); }
 .btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
-.btn.armed { background: var(--warn); border-color: transparent; color: #fff; }
+.btn.armed { background: var(--warn); border-color: transparent; color: var(--warn-ink); }
 .maxform { display: flex; gap: 8px; margin: 0; }
 .money { flex: 1; display: flex; align-items: center; gap: 4px; padding: 0 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; }
 .money:focus-within { border-color: var(--accent); }
