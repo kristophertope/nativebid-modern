@@ -1,4 +1,4 @@
-# Privacy Policy — Modern Viewer for NativeBid
+# Privacy Policy — NativeBid Modern
 
 Last updated: October 23, 2026
 
@@ -30,4 +30,4 @@ Your use of nativebid.com remains subject to NativeBid's own privacy policy and 
 
 ## Contact
 
-Questions about this policy: CONTACT_EMAIL
+Questions about this policy: open an issue at https://github.com/kristophertope/nativebid-modern/issues
