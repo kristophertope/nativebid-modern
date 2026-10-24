@@ -9,6 +9,11 @@ html.nbx body {
   background: #f7f7f5 !important;
 }
 
+html.nbx body.modal-open {
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
 @media (prefers-color-scheme: dark) {
   html.nbx,
   html.nbx body {

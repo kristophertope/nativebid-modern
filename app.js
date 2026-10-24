@@ -473,6 +473,12 @@
         status: text($('.detail__status-label .label')),
         reserve: text($('.awe-rt-ReserveStatus', box)),
         max: maxEl && !maxEl.classList.contains('awe-hidden') ? text($('#MaxBid .NumberPart')) : '',
+        notice: [...new Set(
+          $$('.awe-rt-ListingActionMessage, .ContextualStatus, main .alert, main .validation-summary-errors')
+            .filter(el => !hidden(el) && !el.closest('.detail__biddermax, .modal') && !el.classList.contains('detail__biddermax'))
+            .map(text)
+            .filter(Boolean),
+        )].join(' '),
         deadline,
         open: !!submit && !hidden(submit) && (isNaN(deadline) || deadline > Date.now()),
       };
@@ -486,47 +492,87 @@
     const bidsEl = historyHref ? h('a', { class: 'link', href: historyHref }) : h('span', { class: 'muted' });
     const reserveEl = h('div', { class: 'note' });
     const mineEl = h('div', { class: 'mine hidden' });
+    const noticeEl = h('div', { class: 'mine hidden' });
     const quick = h('button', { class: 'btn primary', type: 'button' });
     const input = h('input', { inputmode: 'decimal', autocomplete: 'off', placeholder: 'Your max bid', 'aria-label': 'Max bid amount' });
     const maxBtn = h('button', { class: 'btn', type: 'submit' }, 'Set max bid');
     const err = h('div', { class: 'err' });
+    const feeEl = h('div', { class: 'note hidden' });
     const controls = h('div', { style: 'display:grid;gap:12px' },
       quick,
       h('form', { class: 'maxform', onsubmit: e => { e.preventDefault(); submitMax(); } },
         h('label', { class: 'money' }, '$', input), maxBtn),
+      feeEl,
       err,
-      h('div', { class: 'note' }, 'Proxy bidding: NativeBid bids for you up to your max. Each bid is confirmed twice—once here, then on NativeBid’s own confirmation page.'));
+      h('div', { class: 'note' }, 'Proxy bidding: NativeBid bids for you up to your max. Tap once to see the total with fees, then tap again to place the bid.'));
     const closedEl = h('div', { class: 'closed hidden' }, 'Bidding is closed');
 
     let state = read();
-    const armed = new Map();
+    let pending = null;
 
-    function arm(btn, label, action) {
-      if (armed.get(btn)?.label === label) {
-        clearTimeout(armed.get(btn).timer);
-        armed.delete(btn);
-        action();
-        return;
-      }
-      if (armed.has(btn)) clearTimeout(armed.get(btn).timer);
-      const timer = setTimeout(() => { armed.delete(btn); render(); }, 5000);
-      armed.set(btn, { label, timer });
-      render();
+    function clearPending() {
+      if (pending?.timer) clearTimeout(pending.timer);
+      pending = null;
     }
 
-    function placeBid(amount) {
-      const u = new URL('/Listing/ConfirmAction', location.origin);
-      u.searchParams.set('ListingID', listingId);
-      u.searchParams.set('ListingType', listingType);
-      u.searchParams.set('BidAmount', amount.toFixed(2));
-      location.href = u.href;
+    function signInLink() {
+      return h('a', { class: 'link', href: '/Account/LogOn?returnUrl=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in');
+    }
+
+    async function startBid(btn, amount) {
+      if (pending?.btn === btn && pending.amount === amount) {
+        if (pending.loading) return;
+        const url = new URL(pending.action, location.origin);
+        url.search = pending.params;
+        btn.disabled = true;
+        btn.textContent = 'Placing bid…';
+        location.href = url.href;
+        return;
+      }
+      clearPending();
+      err.textContent = '';
+      const mine = pending = { btn, amount, loading: true };
+      render();
+      try {
+        const u = new URL('/Listing/ConfirmAction', location.origin);
+        u.searchParams.set('ListingID', listingId);
+        u.searchParams.set('ListingType', listingType);
+        u.searchParams.set('BidAmount', amount.toFixed(2));
+        const res = await fetch(u, { credentials: 'include' });
+        if (!res.ok) throw new Error(res.status);
+        const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        if (pending !== mine) return;
+        const form = $('form[action*="/Listing/Action"]', doc);
+        if ($('form[action*="/Account/LogOn"]', doc) || !form) {
+          clearPending();
+          if ($('form[action*="/Account/LogOn"]', doc)) err.replaceChildren(signInLink(), ' to place a bid.');
+          else err.replaceChildren(text($('.validation-summary-errors, .alert-danger, .alert', doc)) || 'NativeBid didn’t accept that bid.', ' ', h('a', { class: 'link', href: u.href }, 'Details'));
+          render();
+          return;
+        }
+        const confirmed = parseFloat(($('[name="BidAmount"]', form)?.value || '').replace(/,/g, ''));
+        if (Math.abs(confirmed - amount) > 0.001) {
+          clearPending();
+          err.textContent = 'NativeBid’s confirmation didn’t match your bid amount, so nothing was placed. Reload and try again.';
+          render();
+          return;
+        }
+        mine.loading = false;
+        mine.action = form.getAttribute('action');
+        mine.params = new URLSearchParams(new FormData(form)).toString();
+        const lines = $$('.panel-body p', form).map(text).filter(t => t && !/^confirm your bid/i.test(t));
+        mine.total = (/up to\s*(\$[\d,]+(?:\.\d+)?)/i.exec(lines.find(l => /including/i.test(l)) || '') || [])[1] || '';
+        mine.fees = lines.filter(l => !/including/i.test(l)).join(' ');
+        mine.timer = setTimeout(() => { if (pending === mine) { clearPending(); render(); } }, 10000);
+      } catch {
+        if (pending === mine) { clearPending(); err.textContent = 'Couldn’t reach NativeBid. Try again.'; }
+      }
+      render();
     }
 
     quick.addEventListener('click', () => {
       const min = parseFloat(state.min.replace(/,/g, ''));
-      if (isNaN(min)) return;
-      err.textContent = '';
-      arm(quick, `Tap again to bid ${money(min)}`, () => placeBid(min));
+      if (!isNaN(min)) startBid(quick, min);
     });
 
     function submitMax() {
@@ -534,15 +580,21 @@
       const min = parseFloat(state.min.replace(/,/g, ''));
       if (isNaN(amount)) { err.textContent = 'Enter an amount.'; return; }
       if (!isNaN(min) && amount < min) { err.textContent = `Your max bid must be at least ${money(min)}.`; return; }
-      err.textContent = '';
-      arm(maxBtn, `Confirm ${money(amount)}`, () => placeBid(amount));
+      startBid(maxBtn, amount);
     }
     input.addEventListener('input', () => {
       err.textContent = '';
-      if (armed.has(maxBtn)) { clearTimeout(armed.get(maxBtn).timer); armed.delete(maxBtn); render(); }
+      if (pending?.btn === maxBtn) { clearPending(); render(); }
     });
 
+    function buttonLabel(btn, idle) {
+      if (pending?.btn !== btn) return idle;
+      if (pending.loading) return 'Checking fees…';
+      return `Confirm ${money(pending.amount)}` + (pending.total ? ` · up to ${pending.total} with fees` : '');
+    }
+
     function render() {
+      if (pending?.btn === quick && state.min && parseFloat(state.min.replace(/,/g, '')) !== pending.amount) clearPending();
       statusEl.textContent = state.status || (state.open ? 'Active' : 'Closed');
       if (isNaN(state.deadline)) clockEl.removeAttribute('data-deadline');
       else clockEl.dataset.deadline = state.deadline;
@@ -552,10 +604,15 @@
       reserveEl.textContent = state.reserve;
       mineEl.textContent = state.max ? `Your max bid is ${money(state.max)}` : '';
       mineEl.classList.toggle('hidden', !state.max);
-      quick.textContent = armed.get(quick)?.label || (state.min ? `Bid ${money(state.min)}` : 'Bid');
-      quick.classList.toggle('armed', armed.has(quick));
-      maxBtn.textContent = armed.get(maxBtn)?.label || 'Set max bid';
-      maxBtn.classList.toggle('armed', armed.has(maxBtn));
+      noticeEl.textContent = state.notice;
+      noticeEl.classList.toggle('hidden', !state.notice);
+      quick.textContent = buttonLabel(quick, state.min ? `Bid ${money(state.min)}` : 'Bid');
+      quick.classList.toggle('armed', pending?.btn === quick && !pending.loading);
+      maxBtn.textContent = buttonLabel(maxBtn, 'Set max bid');
+      maxBtn.classList.toggle('armed', pending?.btn === maxBtn && !pending.loading);
+      const ready = pending && !pending.loading;
+      feeEl.textContent = ready ? `${pending.fees} Tap again to place your bid.`.trim() : '';
+      feeEl.classList.toggle('hidden', !ready);
       if (!input.value && state.min) input.placeholder = `${money(state.min)} or more`;
       controls.classList.toggle('hidden', !state.open || !listingId);
       closedEl.classList.toggle('hidden', state.open);
@@ -622,6 +679,7 @@
             h('div', { class: 'buy-top' }, statusEl, clockEl),
             h('div', { class: 'price-block' }, h('div', null, priceLabel, priceEl), bidsEl),
             reserveEl,
+            noticeEl,
             mineEl,
             controls,
             closedEl,
