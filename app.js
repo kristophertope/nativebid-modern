@@ -147,7 +147,15 @@
         h('nav', { class: 'nav' },
           h('a', { href: '/' }, 'Auctions'),
           cats.length ? menu('Browse', cats.map(c => h('a', { href: c.href }, c.name, c.count ? h('small', null, c.count.toLocaleString()) : null))) : h('a', { href: '/Browse' }, 'Browse'),
-          userNav)));
+          userNav),
+        h('details', { class: 'menu mobile-menu' },
+          h('summary', { 'aria-label': 'Menu' }, svg('M4 7h16M4 12h16M4 17h16')),
+          h('div', { class: 'menu-panel' },
+            h('a', { href: '/' }, 'Auctions'),
+            h('a', { href: '/Browse' }, 'All lots'),
+            cats.filter(c => !/all categories/i.test(c.name)).map(c => h('a', { href: c.href }, c.name, c.count ? h('small', null, c.count.toLocaleString()) : null)),
+            user.length > 0 && h('hr'),
+            user.map(l => h('a', { href: l.href }, l.label))))));
 
     shadow.addEventListener('click', e => {
       for (const d of shadow.querySelectorAll('details.menu[open]')) if (!d.contains(e.target)) d.open = false;
@@ -362,7 +370,7 @@
           !isNaN(ev.deadline) ? h('span', { class: 'clock', 'data-deadline': ev.deadline }) : (ev.label || ev.date) && h('span', { class: 'muted' }, [ev.label, ev.date].filter(Boolean).join(' '))),
         h('a', { href: ev.href }, h('h2', null, ev.title)),
         ev.summary && h('div', { class: 'muted' }, ev.summary),
-        ev.lots.length && h('div', { class: 'strip' }, ev.lots.map(l => h('a', { href: l.href }, img(l.src)))),
+        ev.lots.length > 0 && h('div', { class: 'strip' }, ev.lots.map(l => h('a', { href: l.href }, img(l.src)))),
         h('a', { class: 'view-lots', href: ev.href }, 'View all lots →')));
   }
 
@@ -381,8 +389,8 @@
     return h('main', { class: 'page' },
       h('div', { class: 'head' },
         h('h1', null, 'Auctions'),
-        tabs.length && h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: new URL(t.href).searchParams.get('ViewFilter') === filter ? 'on' : '' }, t.label)))),
-      cats.length && h('div', { class: 'cats' },
+        tabs.length > 0 && h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: new URL(t.href).searchParams.get('ViewFilter') === filter ? 'on' : '' }, t.label)))),
+      cats.length > 0 && h('div', { class: 'cats' },
         h('a', { href: '/Browse' }, 'All lots'),
         cats.map(c => h('a', { href: c.href }, c.name, h('small', null, c.count.toLocaleString())))),
       list,
@@ -467,9 +475,10 @@
       const submit = $('#SubmitBid');
       const deadline = clock($('[data-epoch="ending"]', box)?.getAttribute('data-action-time'));
       return {
-        price: text($('.detail__price .awe-rt-CurrentPrice .NumberPart', box) || $('.awe-rt-CurrentPrice .NumberPart')),
+        price: text($('.detail__price .awe-rt-CurrentPrice .NumberPart', box) || $('.closed-details .NumberPart') || $('.awe-rt-CurrentPrice .NumberPart')),
+        sold: !!$('.closed-details .sold') && !hidden($('.closed-details .sold')),
         min: text($('.Bidding_Listing_MinPrice .NumberPart', box)),
-        bids: text($('.awe-rt-AcceptedListingActionCount')),
+        bids: text($('.awe-rt-AcceptedListingActionCount')) || (/(\d+)\s*Bid\(s\)/i.exec(text($('.closed-details'))) || [])[1] || '',
         status: text($('.detail__status-label .label')),
         reserve: text($('.awe-rt-ReserveStatus', box)),
         max: maxEl && !maxEl.classList.contains('awe-hidden') ? text($('#MaxBid .NumberPart')) : '',
@@ -635,7 +644,7 @@
       if (isNaN(state.deadline)) clockEl.removeAttribute('data-deadline');
       else clockEl.dataset.deadline = state.deadline;
       priceEl.textContent = money(state.price) || '—';
-      priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : 'Final price';
+      priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : state.sold ? 'Sold for' : 'Final price';
       bidsEl.textContent = state.bids ? `${state.bids} bid${state.bids === '1' ? '' : 's'}` : '';
       reserveEl.textContent = state.reserve;
       const tone = /not the high bidder|not currently winning|did not win|beating your/i.test(state.notice) ? 'losing'
@@ -657,7 +666,7 @@
       feeEl.classList.toggle('hidden', !ready);
       if (!input.value && state.min) input.placeholder = `${money(state.min)} or more`;
       controls.classList.toggle('hidden', !state.open || !listingId);
-      closedEl.classList.toggle('hidden', state.open);
+      closedEl.classList.toggle('hidden', state.open || !!state.notice);
       tick();
     }
 
@@ -726,8 +735,8 @@
             controls,
             closedEl,
             watch,
-            fees.length && h('div', { class: 'note' }, fees.join(' '))),
-          specs.length && h('section', { class: 'section' },
+            fees.length > 0 && h('div', { class: 'note' }, fees.join(' '))),
+          specs.length > 0 && h('section', { class: 'section' },
             h('h2', null, 'Details'),
             h('dl', { class: 'specs' }, specs.map(([k, v]) => [h('dt', null, k), h('dd', null, v)]))),
           desc && h('section', { class: 'section' }, h('h2', null, 'Description'), desc))));

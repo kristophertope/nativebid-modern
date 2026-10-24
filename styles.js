@@ -3,6 +3,7 @@ globalThis.NBX_CSS = `
   all: initial;
   display: block;
   min-height: 100vh;
+  overflow-x: clip;
   --bg: #f7f7f5;
   --surface: #ffffff;
   --ink: #18181b;
@@ -108,6 +109,13 @@ summary::-webkit-details-marker { display: none; }
 .menu-panel a { display: flex; justify-content: space-between; gap: 16px; padding: 9px 12px; border-radius: 9px; }
 .menu-panel a:hover { background: var(--bg); }
 .menu-panel small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.menu-panel hr { width: 100%; margin: 6px 0; border: 0; border-top: 1px solid var(--line); }
+.mobile-menu { display: none; }
+.mobile-menu summary { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; color: var(--ink); cursor: pointer; list-style: none; }
+.mobile-menu summary svg { width: 22px; height: 22px; }
+.mobile-menu[open] summary { background: var(--surface); }
+.mobile-menu .menu-panel { width: min(320px, calc(100vw - 32px)); }
+.mobile-menu .menu-panel a { padding: 12px; font-size: 16px; }
 
 .page { max-width: 1440px; margin: 0 auto; padding: 28px 24px 96px; }
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
@@ -175,7 +183,8 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
 .track::-webkit-scrollbar { display: none; }
 .slide { flex: 0 0 100%; height: min(72vh, 720px); display: grid; place-items: center; scroll-snap-align: center; scroll-snap-stop: always; }
-.slide img { width: 100%; height: 100%; object-fit: contain; }
+.slide { position: relative; }
+.slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .arrow {
   position: absolute;
   top: 50%;
@@ -248,6 +257,10 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .foot { max-width: 1440px; margin: 0 auto; padding: 0 24px 40px; text-align: center; }
 .foot button { border: 0; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; }
 
+@media (max-width: 960px) {
+  .nav { display: none; }
+  .mobile-menu { display: block; margin-left: auto; }
+}
 @media (max-width: 900px) {
   .detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .gallery { position: static; }
@@ -256,7 +269,7 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 @media (max-width: 720px) {
   .bar { flex-wrap: wrap; gap: 10px; padding: 10px 16px; }
   .search { order: 3; flex-basis: 100%; max-width: none; }
-  .nav > a, .nav summary { padding: 8px 9px; font-size: 14px; }
+  .crumbs { gap: 8px; margin-bottom: 14px; }
   .page { padding: 20px 16px 80px; }
   h1, .info h1 { font-size: 24px; }
   .event { grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 12px; }
