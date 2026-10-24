@@ -428,6 +428,7 @@
         : priceEl.classList.contains('winning') ? (ended ? 'Won' : 'Winning') : '';
     }
     status = status.toLowerCase() === 'not winning' ? 'Outbid' : status.toLowerCase().replace(/^\w/, c => c.toUpperCase());
+    const unwatch = /\/Account\/RemoveWatch\/\d+/i.exec($$('[href*="RemoveWatch"], [onclick*="RemoveWatch"]', s).map(el => el.getAttribute('href') || el.getAttribute('onclick')).join(' '));
     return {
       id: s.getAttribute('data-listingid'),
       href: abs(a.getAttribute('href'), base),
@@ -443,6 +444,7 @@
       tone: /outbid|lost|not won|reserve not met/i.test(status) ? 'losing' : /winning|won/i.test(status) ? 'winning' : '',
       deadline,
       ended,
+      link: unwatch ? { href: abs(unwatch[0], base), label: 'Stop watching' } : null,
     };
   }
 
@@ -469,7 +471,7 @@
       status: page.endsWith('/won') ? 'Won' : page.endsWith('/lost') ? 'Not won' : '',
       tone: page.endsWith('/won') ? 'winning' : '',
       when: sold ? [sold[1], sold[2], sold[3]].filter(Boolean).join(' ') : '',
-      invoice: invoice ? { href: abs(invoice.getAttribute('href'), base), label: text(invoice) } : null,
+      link: invoice ? { href: abs(invoice.getAttribute('href'), base), label: text(invoice) || 'Invoice' } : null,
       deadline: NaN,
       ended: true,
     };
@@ -477,8 +479,8 @@
 
   function bidCard(it) {
     const card = bidTile(it);
-    return it.invoice
-      ? h('div', { class: 'card-wrap' }, card, h('a', { class: 'link', href: it.invoice.href }, it.invoice.label || 'Invoice'))
+    return it.link
+      ? h('div', { class: 'card-wrap' }, card, h('a', { class: 'link', href: it.link.href }, it.link.label))
       : card;
   }
 
@@ -492,7 +494,7 @@
         h('span', { class: 'price' }, money(it.price)),
         it.max && h('span', { class: 'muted' }, `Your max ${money(it.max)}`),
         it.when && h('span', { class: 'muted' }, it.when)),
-      it.tone === 'losing' && !it.ended && it.min && h('div', { class: 'muted' }, `Next bid ${money(it.min)}`),
+      it.tone !== 'winning' && !it.ended && it.min && h('div', { class: 'muted' }, `Next bid ${money(it.min)}`),
       h('div', { class: 'title' }, it.title),
       h('div', { class: 'chips' },
         it.msrp && h('span', { class: 'chip strong' }, `MSRP ${it.msrp}`),
@@ -576,9 +578,9 @@
       if (it.live) cards.set(it.id, { el, json: JSON.stringify(it) });
       return el;
     };
-    const parse = (doc, base) => $$('section[data-listingid], .myaccount .list', doc)
+    const parse = (doc, base) => $$('.myaccount [data-listingid], .myaccount .list', doc)
       .map(s => {
-        if (!s.matches('section')) return parsePurchase(s, base);
+        if (!s.hasAttribute('data-listingid')) return parsePurchase(s, base);
         const it = parseBid(s, doc === document ? docClock : clockFor(doc), base);
         if (it) it.live = doc === document;
         return it;
@@ -586,7 +588,7 @@
       .filter(Boolean);
 
     everySecond = () => {
-      for (const s of $$('section[data-listingid]')) {
+      for (const s of $$('.myaccount [data-listingid]')) {
         const c = cards.get(s.getAttribute('data-listingid'));
         const it = c && parseBid(s, docClock, location.href);
         if (!it) continue;
