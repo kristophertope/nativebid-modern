@@ -133,16 +133,23 @@
     const user = uniqBy($$('.user-nav a[href]')
       .filter(a => !a.closest('.visible-xs') && !/^#|^javascript/i.test(a.getAttribute('href')) && !/\/browse$/i.test(a.getAttribute('href')))
       .map(a => ({ label: text(a), href: abs(a.getAttribute('href')) }))
-      .filter(l => l.label), l => l.href);
+      .filter(l => l.label && !/^\/account(\/summary)?\/?$/i.test(new URL(l.href).pathname)), l => l.href);
+    const signOut = user.filter(l => /\/account\/logoff/i.test(l.href));
+    const userLinks = user.filter(l => !signOut.includes(l));
+    const accountSection = $$('.myaccount__menu .nav-section-container').find(c => /^account$/i.test(text($('.nav-section-label', c))));
+    const accountLinks = accountSection
+      ? $$('a[href]', accountSection).map(a => ({ label: text(a), href: abs(a.getAttribute('href')) }))
+      : signOut.length > 0
+        ? [['Details', '/Account/AccountSettings'], ['Addresses', '/Account/AddressManagement'], ['Credit Cards', '/Account/StripeCardManagement'], ['Password', '/Account/ChangePassword']].map(([label, href]) => ({ label, href: abs(href) }))
+        : [];
+    const links = list => list.map(l => h('a', { href: l.href }, l.label));
 
     const q = new URL(location.href).searchParams.get('FullTextQuery') || '';
     const menu = (label, links) => h('details', { class: 'menu' },
       h('summary', null, label),
       h('div', { class: 'menu-panel' }, links));
 
-    const userNav = user.length > 3
-      ? menu('Account', user.map(l => h('a', { href: l.href }, l.label)))
-      : user.map(l => h('a', { href: l.href }, l.label));
+    const userNav = [links(userLinks), accountLinks.length > 0 && menu('Account', links(accountLinks)), links(signOut)];
 
     const bar = h('header', { class: 'top' },
       h('div', { class: 'bar' },
@@ -159,8 +166,12 @@
             h('a', { href: '/' }, 'Auctions'),
             h('a', { href: '/Browse' }, 'All lots'),
             cats.filter(c => !/all categories/i.test(c.name)).map(c => h('a', { href: c.href }, c.name, c.count ? h('small', null, c.count.toLocaleString()) : null)),
-            user.length > 0 && h('hr'),
-            user.map(l => h('a', { href: l.href }, l.label))))));
+            userLinks.length > 0 && h('hr'),
+            links(userLinks),
+            accountLinks.length > 0 && h('hr'),
+            links(accountLinks),
+            signOut.length > 0 && h('hr'),
+            links(signOut)))));
 
     shadow.addEventListener('click', e => {
       for (const d of shadow.querySelectorAll('details.menu[open]')) if (!d.contains(e.target)) d.open = false;
