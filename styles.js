@@ -122,8 +122,8 @@ summary::-webkit-details-marker { display: none; }
 h1 { margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; overflow-wrap: anywhere; }
 .lede { margin-top: 6px; color: var(--muted); max-width: 70ch; }
 .tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.seg { display: inline-flex; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
-.seg a, .seg button { padding: 6px 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; font-weight: 500; }
+.seg { display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
+.seg a, .seg button { flex: none; white-space: nowrap; padding: 6px 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; font-weight: 500; }
 .seg .on { background: var(--ink); color: var(--bg); }
 select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 
@@ -145,6 +145,9 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
   font-variant-numeric: tabular-nums;
 }
 .pill-time.soon { background: var(--warn); }
+.pill-status { position: absolute; left: 10px; top: 10px; padding: 4px 10px; border-radius: 999px; background: rgba(17, 17, 19, .78); color: #fff; font-size: 12px; font-weight: 700; }
+.pill-status.winning { background: var(--win); color: var(--win-ink); }
+.pill-status.losing { background: var(--warn); color: var(--warn-ink); }
 .pill-time:empty { display: none; }
 .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .price { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }

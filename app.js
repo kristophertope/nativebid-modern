@@ -398,6 +398,110 @@
       feed({ container: list, parse: parseEvents, render: eventCard, firstDoc: document, empty: 'No auctions here right now.' }));
   }
 
+  const docClock = clockFor(document);
+
+  function parseBid(s, clock, base) {
+    const a = $$('a[href*="/LotDetails/"], a[href*="/Listing/Details/"]', s).find(x => text(x));
+    if (!a) return null;
+    const raw = text(a);
+    const { title, msrp } = splitTitle(raw);
+    const thumb = abs($('.img-container img, img', s)?.getAttribute('src'), base);
+    const deadline = clock($('[data-epoch="ending"]', s)?.getAttribute('data-action-time'));
+    const ended = $$('.awe-rt-ShowOnEnd', s).some(el => !el.classList.contains('awe-hidden')) || (!isNaN(deadline) && deadline <= Date.now());
+    const statusEl = $('.InlineContextualStatus', s);
+    const priceEl = $('.awe-rt-CurrentPrice', s);
+    let status = hidden(statusEl) ? '' : text(statusEl);
+    if (!status && priceEl) {
+      status = priceEl.classList.contains('not-winning') ? 'Outbid'
+        : priceEl.classList.contains('winning-reserve') ? 'Reserve not met'
+        : priceEl.classList.contains('winning') ? (ended ? 'Won' : 'Winning') : '';
+    }
+    status = status.toLowerCase() === 'not winning' ? 'Outbid' : status.toLowerCase().replace(/^\w/, c => c.toUpperCase());
+    return {
+      id: s.getAttribute('data-listingid'),
+      href: abs(a.getAttribute('href'), base),
+      title,
+      msrp,
+      lot: (/^Lot\s+(\S+)/i.exec(raw) || [])[1] || '',
+      thumb,
+      image: large(thumb),
+      price: text($('.NumberPart', priceEl || s)),
+      max: text($('.awe-rt-MaxBid .NumberPart', s)),
+      min: text($('.Bidding_Listing_MinPrice .NumberPart', s)),
+      status,
+      tone: /outbid|lost|not won|reserve not met/i.test(status) ? 'losing' : /winning|won/i.test(status) ? 'winning' : '',
+      deadline,
+      ended,
+    };
+  }
+
+  function bidCard(it) {
+    return h('a', { class: 'card', href: it.href },
+      h('div', { class: 'well' },
+        img(it.image, it.thumb),
+        it.status && h('span', { class: `pill-status ${it.tone}` }, it.status),
+        it.ended || isNaN(it.deadline) ? null : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
+      h('div', { class: 'price-row' },
+        h('span', { class: 'price' }, money(it.price)),
+        it.max && h('span', { class: 'muted' }, `Your max ${money(it.max)}`)),
+      it.tone === 'losing' && !it.ended && it.min && h('div', { class: 'muted' }, `Next bid ${money(it.min)}`),
+      h('div', { class: 'title' }, it.title),
+      h('div', { class: 'chips' },
+        it.msrp && h('span', { class: 'chip strong' }, `MSRP ${it.msrp}`),
+        it.lot && h('span', { class: 'chip' }, `Lot ${it.lot}`)));
+  }
+
+  function bidsPage() {
+    const section = $$('.myaccount__menu .nav-section-container').find(c => /bidding/i.test(text($('.nav-section-label', c))));
+    const tabs = section ? $$('a[href]', section).map(a => ({ label: text(a), href: abs(a.getAttribute('href')), on: !!a.closest('li.active') })) : [];
+
+    const tools = h('div', { class: 'tools' });
+    const sortSel = $('#SortFilterOptions');
+    if (sortSel?.form) {
+      tools.append(h('select', {
+        'aria-label': 'Sort',
+        onchange: e => { sortSel.value = e.target.value; sortSel.form.submit(); },
+      }, $$('option', sortSel).map(o => h('option', { value: o.value, selected: o.selected }, text(o)))));
+    }
+
+    const cards = new Map();
+    const render = it => {
+      const el = bidCard(it);
+      if (it.live) cards.set(it.id, { el, json: JSON.stringify(it) });
+      return el;
+    };
+    const parse = (doc, base) => $$('section[data-listingid]', doc)
+      .map(s => {
+        const it = parseBid(s, doc === document ? docClock : clockFor(doc), base);
+        if (it) it.live = doc === document;
+        return it;
+      })
+      .filter(Boolean);
+
+    everySecond = () => {
+      for (const s of $$('section[data-listingid]')) {
+        const c = cards.get(s.getAttribute('data-listingid'));
+        const it = c && parseBid(s, docClock, location.href);
+        if (!it) continue;
+        it.live = true;
+        const json = JSON.stringify(it);
+        if (json === c.json) continue;
+        const el = bidCard(it);
+        c.el.replaceWith(el);
+        Object.assign(c, { el, json });
+      }
+    };
+
+    const grid = h('div', { class: 'grid' });
+    return h('main', { class: 'page' },
+      h('div', { class: 'head' },
+        h('h1', null, 'My bids'),
+        tools),
+      tabs.length > 0 && h('div', { class: 'head' }, h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: t.on ? 'on' : '' }, t.label)))),
+      grid,
+      feed({ container: grid, parse, render, firstDoc: document, empty: 'Nothing here yet.' }));
+  }
+
   function gallery(images) {
     const n = images.length;
     let cur = 0;
@@ -769,6 +873,7 @@
     let main;
     if ($('h3.detail__title')) main = detailPage();
     else if (/^\/(listing\/details|event\/lotdetails)\//i.test(location.pathname)) main = missingLotPage();
+    else if (/^\/account\/bidding\//i.test(location.pathname)) main = bidsPage();
     else if ($('.event-hp') || location.pathname === '/') main = homePage();
     else if ($('section[data-listingid]') || $('#SortFilterOptions') || /^\/(browse|search|listing|event\/details)/i.test(location.pathname)) main = resultsPage();
     else throw new Error('Unrecognized page');
