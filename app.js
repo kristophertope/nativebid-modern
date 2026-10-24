@@ -515,6 +515,19 @@
       pending = null;
     }
 
+    let messageCache;
+    function messages() {
+      if (!messageCache) {
+        messageCache = {};
+        for (const sc of $$('script:not([src])')) {
+          for (const m of sc.textContent.matchAll(/contextMessageDictionary\["(\w+)"\]\s*=\s*"((?:[^"\\]|\\.)*)"/g)) {
+            messageCache[m[1]] = m[2].replace(/\\(.)/g, '$1');
+          }
+        }
+      }
+      return messageCache;
+    }
+
     function signInLink() {
       return h('a', { class: 'link', href: '/Account/LogOn?returnUrl=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in');
     }
@@ -524,9 +537,32 @@
         if (pending.loading) return;
         const url = new URL(pending.action, location.origin);
         url.search = pending.params;
+        clearPending();
         btn.disabled = true;
         btn.textContent = 'Placing bid…';
-        location.href = url.href;
+        let result = '';
+        try {
+          const res = await fetch(url, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+          const body = (await res.text()).trim();
+          try { result = JSON.parse(body); } catch { result = body; }
+          if (result && typeof result === 'object') result = result.ReasonCode || result.Status || result.Message || JSON.stringify(result);
+          result = String(result);
+          if (!res.ok) throw new Error(result || res.status);
+        } catch (e) {
+          btn.disabled = false;
+          err.textContent = 'Couldn’t reach NativeBid, so your bid may not have gone through. Reload to check.';
+          render();
+          return;
+        }
+        if (/^(ok|success|actionsuccess)$/i.test(result)) {
+          btn.textContent = 'Bid placed ✓';
+          err.textContent = '';
+          setTimeout(() => location.reload(), 900);
+          return;
+        }
+        btn.disabled = false;
+        err.textContent = messages()[result] || result || 'NativeBid didn’t accept that bid.';
+        render();
         return;
       }
       clearPending();
@@ -551,9 +587,9 @@
           return;
         }
         const confirmed = parseFloat(($('[name="BidAmount"]', form)?.value || '').replace(/,/g, ''));
-        if (Math.abs(confirmed - amount) > 0.001) {
+        if (Math.abs(confirmed - amount) > 0.001 || $('[name="ListingID"]', form)?.value !== listingId) {
           clearPending();
-          err.textContent = 'NativeBid’s confirmation didn’t match your bid amount, so nothing was placed. Reload and try again.';
+          err.textContent = 'NativeBid’s confirmation didn’t match this bid, so nothing was placed. Reload and try again.';
           render();
           return;
         }
