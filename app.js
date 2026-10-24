@@ -882,8 +882,11 @@
       h('button', { type: 'button', onclick: () => { try { localStorage.setItem('nbx-off', '1'); } catch {} location.reload(); } }, 'Switch to the classic NativeBid layout'));
     shadow.append(header(), main, footer);
     document.body.append(host);
-    $$('link[rel~="icon"]').forEach(l => l.remove());
-    document.head.append(h('link', { rel: 'icon', type: 'image/svg+xml', href: chrome.runtime.getURL('icons/favicon.svg') }));
+    const icon = globalThis.chrome?.runtime?.getURL?.('icons/favicon.svg');
+    if (icon) {
+      $$('link[rel~="icon"]').forEach(l => l.remove());
+      document.head.append(h('link', { rel: 'icon', type: 'image/svg+xml', href: icon }));
+    }
     tick();
     setInterval(() => { everySecond(); tick(); }, 1000);
   } catch (e) {
