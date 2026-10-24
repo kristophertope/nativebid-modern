@@ -18,6 +18,9 @@
   const text = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
   const abs = (href, base = location.href) => { try { return href ? new URL(href, base).href : ''; } catch { return ''; } };
   const hidden = el => !el || !!el.closest('.awe-hidden, [style*="display: none"], [style*="display:none"]');
+  const num = v => parseFloat(String(v ?? '').replace(/[^0-9.]/g, ''));
+  const uniqBy = (list, key) => { const seen = new Set(); return list.filter(x => !seen.has(key(x)) && seen.add(key(x))); };
+  const bidsLabel = n => (n ? `${n} bid${n === '1' ? '' : 's'}` : '');
 
   function h(tag, props, ...kids) {
     const el = document.createElement(tag);
@@ -62,7 +65,7 @@
   const large = src => (src || '').replace(/_(thumbfit|thumbcrop|fullsize)\.(jpe?g|png|webp)/i, '_largesize.$2');
 
   function money(v) {
-    const n = parseFloat(String(v ?? '').replace(/[^0-9.]/g, ''));
+    const n = num(v);
     if (isNaN(n)) return '';
     return '$' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
   }
@@ -89,6 +92,16 @@
     };
   }
 
+  const fmtDate = ms => (isNaN(ms) ? '' : new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
+
+  const parseCats = (sel, keep) => uniqBy($$(sel)
+    .map(a => ({
+      name: text($('.category-name__container', a) || a),
+      count: num(text($('.badge', a))) || 0,
+      href: abs(a.getAttribute('href')),
+    }))
+    .filter(c => c.href && !c.href.endsWith('#') && keep(c)), c => c.href);
+
   function remaining(ms) {
     if (ms <= 0) return 'Ended';
     const s = Math.floor(ms / 1000);
@@ -99,6 +112,7 @@
     return `${sec}s left`;
   }
 
+  let everySecond = () => {};
   const host = h('div', { id: 'nbx-root' });
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.append(h('style', null, globalThis.NBX_CSS || ''));
@@ -114,21 +128,12 @@
   }
 
   function header() {
-    const seen = new Set();
-    const cats = $$('.browse-categories a[href], .categories--vertical a[href]')
-      .map(a => ({
-        name: text($('.category-name__container', a) || a),
-        count: parseInt(text($('.badge', a)), 10) || 0,
-        href: abs(a.getAttribute('href')),
-      }))
-      .filter(c => c.href && !c.href.endsWith('#') && (c.count > 0 || /all categories/i.test(c.name)))
-      .filter(c => !seen.has(c.href) && seen.add(c.href));
+    const cats = parseCats('.browse-categories a[href], .categories--vertical a[href]', c => c.count > 0 || /all categories/i.test(c.name));
 
-    const userSeen = new Set();
-    const user = $$('.user-nav a[href]')
+    const user = uniqBy($$('.user-nav a[href]')
       .filter(a => !a.closest('.visible-xs') && !/^#|^javascript/i.test(a.getAttribute('href')) && !/\/browse$/i.test(a.getAttribute('href')))
       .map(a => ({ label: text(a), href: abs(a.getAttribute('href')) }))
-      .filter(l => l.label && !userSeen.has(l.href) && userSeen.add(l.href));
+      .filter(l => l.label), l => l.href);
 
     const q = new URL(location.href).searchParams.get('FullTextQuery') || '';
     const menu = (label, links) => h('details', { class: 'menu' },
@@ -193,7 +198,7 @@
   }
 
   function listingCard(it) {
-    const bids = it.bids ? `${it.bids} bid${it.bids === '1' ? '' : 's'}` : '';
+    const bids = bidsLabel(it.bids);
     return h('a', { class: 'card' + (it.ended ? ' ended' : ''), href: it.href },
       h('div', { class: 'well' },
         img(it.image, it.thumb),
@@ -310,18 +315,18 @@
 
     const tools = h('div', { class: 'tools' });
     const statusVal = $('#StatusFilter')?.value;
+    const goWith = (k, v) => { url.searchParams.set(k, v); url.searchParams.delete('page'); location.href = url.href; };
     if (statusVal != null) {
-      const go = v => { url.searchParams.set('StatusFilter', v); url.searchParams.delete('page'); location.href = url.href; };
       const completed = statusVal === 'completed_only';
       tools.append(h('div', { class: 'seg' },
-        h('button', { class: completed ? '' : 'on', onclick: () => completed && go('active_only') }, 'Active'),
-        h('button', { class: completed ? 'on' : '', onclick: () => !completed && go('completed_only') }, 'Completed')));
+        h('button', { class: completed ? '' : 'on', onclick: () => completed && goWith('StatusFilter', 'active_only') }, 'Active'),
+        h('button', { class: completed ? 'on' : '', onclick: () => !completed && goWith('StatusFilter', 'completed_only') }, 'Completed')));
     }
     const sortSel = $('#SortFilterOptions');
     if (sortSel) {
       tools.append(h('select', {
         'aria-label': 'Sort',
-        onchange: e => { url.searchParams.set('SortFilterOptions', e.target.value); url.searchParams.delete('page'); location.href = url.href; },
+        onchange: e => goWith('SortFilterOptions', e.target.value),
       }, $$('option', sortSel).map(o => h('option', { value: o.value, selected: o.selected }, text(o)))));
     }
 
@@ -355,7 +360,7 @@
         status: text(visible('.event-row__status > div')),
         label: text(visible('.event-row__time-label > div')),
         deadline: timed ? clock(timed.getAttribute('data-action-time')) : NaN,
-        date: dated ? new Date(clock(dated.getAttribute('data-initial-dttm'))).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '',
+        date: dated ? fmtDate(clock(dated.getAttribute('data-initial-dttm'))) : '',
         lots: $$('.event-row__thumbnails a', ev).map(l => ({ href: abs(l.getAttribute('href'), base), src: abs($('img', l)?.getAttribute('src'), base) })),
       };
     }).filter(Boolean);
@@ -375,21 +380,17 @@
   }
 
   function homePage() {
-    const filter = new URL(location.href).searchParams.get('ViewFilter') || 'Current';
-    const tabSeen = new Set();
-    const tabs = $$('.eFilter a[href]')
-      .map(a => ({ href: abs(a.getAttribute('href')), label: text(a).replace(/\s*auctions$/i, '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) }))
-      .filter(t => !tabSeen.has(t.href) && tabSeen.add(t.href));
-    const catSeen = new Set();
-    const cats = $$('.categories--vertical a[href]')
-      .map(a => ({ href: abs(a.getAttribute('href')), name: text($('.category-name__container', a) || a), count: parseInt(text($('.badge', a)), 10) || 0 }))
-      .filter(c => c.count > 0 && !catSeen.has(c.href) && catSeen.add(c.href));
+    const viewFilter = href => (new URL(href).searchParams.get('ViewFilter') || 'Current').toLowerCase();
+    const filter = viewFilter(location.href);
+    const tabs = uniqBy($$('.eFilter a[href]')
+      .map(a => ({ href: abs(a.getAttribute('href')), label: text(a).replace(/\s*auctions$/i, '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) })), t => t.href);
+    const cats = parseCats('.categories--vertical a[href]', c => c.count > 0);
 
     const list = h('div', { class: 'events' });
     return h('main', { class: 'page' },
       h('div', { class: 'head' },
         h('h1', null, 'Auctions'),
-        tabs.length > 0 && h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: new URL(t.href).searchParams.get('ViewFilter') === filter ? 'on' : '' }, t.label)))),
+        tabs.length > 0 && h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: viewFilter(t.href) === filter ? 'on' : '' }, t.label)))),
       cats.length > 0 && h('div', { class: 'cats' },
         h('a', { href: '/Browse' }, 'All lots'),
         cats.map(c => h('a', { href: c.href }, c.name, h('small', null, c.count.toLocaleString())))),
@@ -476,7 +477,7 @@
       const deadline = clock($('[data-epoch="ending"]', box)?.getAttribute('data-action-time'));
       return {
         price: text($('.detail__price .awe-rt-CurrentPrice .NumberPart', box) || $('.closed-details .NumberPart') || $('.awe-rt-CurrentPrice .NumberPart')),
-        sold: !!$('.closed-details .sold') && !hidden($('.closed-details .sold')),
+        sold: !hidden($('.closed-details .sold')),
         min: text($('.Bidding_Listing_MinPrice .NumberPart', box)),
         bids: text($('.awe-rt-AcceptedListingActionCount')) || (/(\d+)\s*Bid\(s\)/i.exec(text($('.closed-details'))) || [])[1] || '',
         status: text($('.detail__status-label .label')),
@@ -520,9 +521,10 @@
     let pending = null;
 
     function clearPending() {
-      if (pending?.timer) clearTimeout(pending.timer);
+      if (pending) clearTimeout(pending.timer);
       pending = null;
     }
+    const busy = () => pending?.phase === 'placing' || pending?.phase === 'placed';
 
     let messageCache;
     function messages() {
@@ -541,42 +543,47 @@
       return h('a', { class: 'link', href: '/Account/LogOn?returnUrl=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in');
     }
 
-    async function startBid(btn, amount) {
-      if (pending?.btn === btn && pending.amount === amount) {
-        if (pending.loading) return;
-        const url = new URL(pending.action, location.origin);
-        url.search = pending.params;
+    async function placeBid(mine) {
+      const url = new URL(mine.action, location.origin);
+      url.search = mine.params;
+      clearTimeout(mine.timer);
+      mine.phase = 'placing';
+      render();
+      let res, result;
+      try {
+        res = await fetch(url, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+        const body = (await res.text()).trim();
+        try { result = JSON.parse(body); } catch { result = body; }
+      } catch {
         clearPending();
-        btn.disabled = true;
-        btn.textContent = 'Placing bid…';
-        let result = '';
-        try {
-          const res = await fetch(url, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
-          const body = (await res.text()).trim();
-          try { result = JSON.parse(body); } catch { result = body; }
-          if (result && typeof result === 'object') result = result.ReasonCode || result.Status || result.Message || JSON.stringify(result);
-          result = String(result);
-          if (!res.ok) throw new Error(result || res.status);
-        } catch (e) {
-          btn.disabled = false;
-          err.textContent = 'Couldn’t reach NativeBid, so your bid may not have gone through. Reload to check.';
-          render();
-          return;
-        }
-        if (/^(ok|success|actionsuccess)$/i.test(result)) {
-          btn.textContent = 'Bid placed ✓';
-          err.textContent = '';
-          setTimeout(() => location.reload(), 900);
-          return;
-        }
-        btn.disabled = false;
-        err.textContent = messages()[result] || result || 'NativeBid didn’t accept that bid.';
+        err.textContent = 'Couldn’t reach NativeBid, so your bid may not have gone through. Reload to check.';
         render();
+        return;
+      }
+      if (result && typeof result === 'object') result = result.ReasonCode || result.Status || result.Message || JSON.stringify(result);
+      result = String(result ?? '');
+      if (res.ok && /^(ok|success|actionsuccess)$/i.test(result)) {
+        mine.phase = 'placed';
+        err.textContent = '';
+        render();
+        setTimeout(() => location.reload(), 900);
+        return;
+      }
+      clearPending();
+      const readable = result && !/[<{]/.test(result) ? result : '';
+      err.textContent = messages()[result] || readable || `NativeBid didn’t accept that bid${res.ok ? '' : ` (error ${res.status})`}.`;
+      render();
+    }
+
+    async function startBid(btn, amount) {
+      if (busy()) return;
+      if (pending?.btn === btn && pending.amount === amount) {
+        if (pending.phase === 'ready') placeBid(pending);
         return;
       }
       clearPending();
       err.textContent = '';
-      const mine = pending = { btn, amount, loading: true };
+      const mine = pending = { btn, amount, phase: 'checking' };
       render();
       try {
         const u = new URL('/Listing/ConfirmAction', location.origin);
@@ -595,14 +602,14 @@
           render();
           return;
         }
-        const confirmed = parseFloat(($('[name="BidAmount"]', form)?.value || '').replace(/,/g, ''));
-        if (Math.abs(confirmed - amount) > 0.001 || $('[name="ListingID"]', form)?.value !== listingId) {
+        const confirmed = num($('[name="BidAmount"]', form)?.value);
+        if (isNaN(confirmed) || Math.abs(confirmed - amount) > 0.001 || $('[name="ListingID"]', form)?.value !== listingId) {
           clearPending();
           err.textContent = 'NativeBid’s confirmation didn’t match this bid, so nothing was placed. Reload and try again.';
           render();
           return;
         }
-        mine.loading = false;
+        mine.phase = 'ready';
         mine.action = form.getAttribute('action');
         mine.params = new URLSearchParams(new FormData(form)).toString();
         const lines = $$('.panel-body p', form).map(text).filter(t => t && !/^confirm your bid/i.test(t));
@@ -616,36 +623,38 @@
     }
 
     quick.addEventListener('click', () => {
-      const min = parseFloat(state.min.replace(/,/g, ''));
+      const min = num(state.min);
       if (!isNaN(min)) startBid(quick, min);
     });
 
     function submitMax() {
-      const amount = parseFloat(input.value.replace(/[$,\s]/g, ''));
-      const min = parseFloat(state.min.replace(/,/g, ''));
+      const amount = num(input.value);
+      const min = num(state.min);
       if (isNaN(amount)) { err.textContent = 'Enter an amount.'; return; }
       if (!isNaN(min) && amount < min) { err.textContent = `Your max bid must be at least ${money(min)}.`; return; }
       startBid(maxBtn, amount);
     }
     input.addEventListener('input', () => {
       err.textContent = '';
-      if (pending?.btn === maxBtn) { clearPending(); render(); }
+      if (pending?.btn === maxBtn && !busy()) { clearPending(); render(); }
     });
 
     function buttonLabel(btn, idle) {
       if (pending?.btn !== btn) return idle;
-      if (pending.loading) return 'Checking fees…';
+      if (pending.phase === 'checking') return 'Checking fees…';
+      if (pending.phase === 'placing') return 'Placing bid…';
+      if (pending.phase === 'placed') return 'Bid placed ✓';
       return `Confirm ${money(pending.amount)}` + (pending.total ? ` · up to ${pending.total} with fees` : '');
     }
 
     function render() {
-      if (pending?.btn === quick && state.min && parseFloat(state.min.replace(/,/g, '')) !== pending.amount) clearPending();
+      if (pending?.btn === quick && !busy() && state.min && num(state.min) !== pending.amount) clearPending();
       statusEl.textContent = state.status || (state.open ? 'Active' : 'Closed');
       if (isNaN(state.deadline)) clockEl.removeAttribute('data-deadline');
       else clockEl.dataset.deadline = state.deadline;
       priceEl.textContent = money(state.price) || '—';
       priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : state.sold ? 'Sold for' : 'Final price';
-      bidsEl.textContent = state.bids ? `${state.bids} bid${state.bids === '1' ? '' : 's'}` : '';
+      bidsEl.textContent = bidsLabel(state.bids);
       reserveEl.textContent = state.reserve;
       const tone = /not the high bidder|not currently winning|did not win|beating your/i.test(state.notice) ? 'losing'
         : /currently winning|have won/i.test(state.notice) ? 'winning' : '';
@@ -658,10 +667,11 @@
       mineEl.classList.toggle('hidden', !maxLine || !!state.notice);
       quick.textContent = buttonLabel(quick, !state.min ? 'Bid' : tone === 'winning' ? `Raise max to ${money(state.min)}` : `Bid ${money(state.min)}`);
       quick.classList.toggle('primary', tone !== 'winning');
-      quick.classList.toggle('armed', pending?.btn === quick && !pending.loading);
+      const ready = pending?.phase === 'ready';
+      quick.classList.toggle('armed', ready && pending.btn === quick);
       maxBtn.textContent = buttonLabel(maxBtn, 'Set max bid');
-      maxBtn.classList.toggle('armed', pending?.btn === maxBtn && !pending.loading);
-      const ready = pending && !pending.loading;
+      maxBtn.classList.toggle('armed', ready && pending.btn === maxBtn);
+      quick.disabled = maxBtn.disabled = busy();
       feeEl.textContent = ready ? `${pending.fees} Tap again to place your bid.`.trim() : '';
       feeEl.classList.toggle('hidden', !ready);
       if (!input.value && state.min) input.placeholder = `${money(state.min)} or more`;
@@ -670,10 +680,12 @@
       tick();
     }
 
-    setInterval(() => {
+    let snapshot = JSON.stringify(state);
+    everySecond = () => {
       const s = read();
-      if (JSON.stringify(s) !== JSON.stringify(state)) { state = s; render(); }
-    }, 1000);
+      const json = JSON.stringify(s);
+      if (json !== snapshot) { state = s; snapshot = json; render(); }
+    };
 
     const watchA = $('.watching__wrapper a[href]');
     let watch = null;
@@ -690,7 +702,7 @@
       const valEl = $('.detail__field-value', row);
       const dt = $('[data-initial-dttm]', valEl || row);
       let value = text(valEl);
-      if (dt && !value) value = new Date(clock(dt.getAttribute('data-initial-dttm'))).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      if (dt && !value) value = fmtDate(clock(dt.getAttribute('data-initial-dttm')));
       return name && value ? [name, value] : null;
     }).filter(Boolean);
 
@@ -742,9 +754,21 @@
           desc && h('section', { class: 'section' }, h('h2', null, 'Description'), desc))));
   }
 
+  function missingLotPage() {
+    const stray = Array.from(document.body.childNodes).filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+    const msg = text($$('main .alert, .validation-summary-errors, .alert').find(el => !hidden(el))) || stray.map(n => n.textContent.trim()).join(' ');
+    stray.forEach(n => n.remove());
+    return h('main', { class: 'page' },
+      h('div', { class: 'head' },
+        h('div', null,
+          h('h1', null, 'This lot isn’t available'),
+          h('div', { class: 'lede' }, msg || 'It may have been removed, or the link may be wrong.', ' ', h('a', { class: 'link', href: '/Browse' }, 'Browse all lots')))));
+  }
+
   try {
     let main;
-    if ($('h3.detail__title') && ($('#ListingImageThumbsCarousel') || $('#previewimg') || $('.awe-rt-BuyBox'))) main = detailPage();
+    if ($('h3.detail__title')) main = detailPage();
+    else if (/^\/(listing\/details|event\/lotdetails)\//i.test(location.pathname)) main = missingLotPage();
     else if ($('.event-hp') || location.pathname === '/') main = homePage();
     else if ($('section[data-listingid]') || $('#SortFilterOptions') || /^\/(browse|search|listing|event\/details)/i.test(location.pathname)) main = resultsPage();
     else throw new Error('Unrecognized page');
@@ -754,7 +778,7 @@
     shadow.append(header(), main, footer);
     document.body.append(host);
     tick();
-    setInterval(tick, 1000);
+    setInterval(() => { everySecond(); tick(); }, 1000);
   } catch (e) {
     console.error('[NativeBid Modern] falling back to original page', e);
     host.remove();
