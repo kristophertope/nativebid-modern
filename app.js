@@ -92,6 +92,8 @@
     };
   }
 
+  const docClock = clockFor(document);
+
   const fmtDate = ms => (isNaN(ms) ? '' : new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
 
   const parseCats = (sel, keep) => uniqBy($$(sel)
@@ -104,7 +106,7 @@
 
   function remaining(ms) {
     if (ms <= 0) return 'Ended';
-    const s = Math.floor(ms / 1000);
+    const s = Math.ceil(ms / 1000);
     const d = Math.floor(s / 86400), hr = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
     if (d) return `${d}d ${hr}h left`;
     if (hr) return `${hr}h ${m}m left`;
@@ -182,7 +184,7 @@
   }
 
   function parseListings(doc, base) {
-    const clock = clockFor(doc);
+    const clock = docClock;
     return $$('section[data-listingid]', doc).map(s => {
       const a = $('h2.title a', s) || $('a[href*="/LotDetails/"], a[href*="/Listing/Details/"]', s);
       if (!a) return null;
@@ -355,7 +357,7 @@
   }
 
   function parseEvents(doc, base) {
-    const clock = clockFor(doc);
+    const clock = docClock;
     return $$('.event-hp', doc).map(ev => {
       const a = $('.event-row__title a', ev) || $('a[href*="/Event/Details/"]', ev);
       if (!a) return null;
@@ -410,8 +412,6 @@
       list,
       feed({ container: list, parse: parseEvents, render: eventCard, firstDoc: document, empty: 'No auctions here right now.' }));
   }
-
-  const docClock = clockFor(document);
 
   function parseBid(s, clock, base) {
     const a = $$('a[href*="/LotDetails/"], a[href*="/Listing/Details/"]', s).find(x => text(x));
@@ -583,7 +583,7 @@
     const parse = (doc, base) => $$('.myaccount [data-listingid], .myaccount .list', doc)
       .map(s => {
         if (!s.hasAttribute('data-listingid')) return parsePurchase(s, base);
-        const it = parseBid(s, doc === document ? docClock : clockFor(doc), base);
+        const it = parseBid(s, docClock, base);
         if (it) it.live = doc === document;
         return it;
       })
@@ -668,7 +668,7 @@
   }
 
   function detailPage() {
-    const clock = clockFor(document);
+    const clock = docClock;
     const box = $('.awe-rt-BuyBox') || document;
     const rawTitle = text($('h3.detail__title'));
     const { title, msrp } = splitTitle(rawTitle);
@@ -1000,7 +1000,13 @@
       document.head.append(h('link', { rel: 'icon', type: 'image/svg+xml', href: icon }));
     }
     tick();
-    setInterval(() => { everySecond(); tick(); }, 1000);
+    const beat = () => {
+      const el = shadow.querySelector('[data-deadline]');
+      const wait = el ? ((+el.dataset.deadline - Date.now()) % 1000 + 1000) % 1000 + 25 : 1000;
+      setTimeout(() => { everySecond(); tick(); beat(); }, wait);
+    };
+    beat();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { everySecond(); tick(); } });
   } catch (e) {
     console.error('[NativeBid Modern] falling back to original page', e);
     host.remove();
