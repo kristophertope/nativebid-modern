@@ -129,6 +129,7 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 32px 20px; }
 .card { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.grid > *, .events > * { content-visibility: auto; contain-intrinsic-size: auto 440px; }
 .inv-list { display: grid; gap: 10px; max-width: 820px; }
 .inv { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; transition: border-color .15s; }
 .inv:hover { border-color: var(--muted); }

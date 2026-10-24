@@ -121,7 +121,9 @@
     const now = Date.now();
     for (const el of shadow.querySelectorAll('[data-deadline]')) {
       const left = +el.dataset.deadline - now;
-      el.textContent = remaining(left);
+      const label = remaining(left);
+      if (el.textContent === label) continue;
+      el.textContent = label;
       el.classList.toggle('soon', left > 0 && left < 5 * 60 * 1000);
       el.closest('.card')?.classList.toggle('ended', left <= 0);
     }
