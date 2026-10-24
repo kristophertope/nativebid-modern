@@ -435,7 +435,43 @@
     };
   }
 
+  function parsePurchase(row, base) {
+    const a = $$('a[href*="/LotDetails/"], a[href*="/Listing/Details/"]', row).find(x => text(x));
+    if (!a) return null;
+    const raw = text(a);
+    const { title, msrp } = splitTitle(raw);
+    const thumb = abs($('img', row)?.getAttribute('src'), base);
+    const listingId = (/\/Listing\/Details\/(\d+)/i.exec($('a[href*="/Listing/Details/"]', row)?.getAttribute('href') || '') || [])[1];
+    const sold = /(\d+\/\d+\/\d+)\s+(\d+:\d+)(?::\d+)?\s*(AM|PM)?/i.exec(text(a.closest('p')).replace(raw, ''));
+    const amounts = $$(':scope > .row .row > div', row).map(text).filter(t => /\$/.test(t));
+    const invoice = $('a[href*="/Account/Invoice/"]', row);
+    const page = location.pathname.toLowerCase();
+    return {
+      id: $('input[name="LineItemIDs"]', row)?.value || listingId || a.getAttribute('href'),
+      href: abs(a.getAttribute('href'), base),
+      title,
+      msrp,
+      lot: (/^Lot\s+(\S+)/i.exec(raw) || [])[1] || '',
+      thumb,
+      image: large(thumb),
+      price: amounts.pop() || '',
+      status: page.endsWith('/won') ? 'Won' : page.endsWith('/lost') ? 'Not won' : '',
+      tone: page.endsWith('/won') ? 'winning' : '',
+      when: sold ? [sold[1], sold[2], sold[3]].filter(Boolean).join(' ') : '',
+      invoice: invoice ? { href: abs(invoice.getAttribute('href'), base), label: text(invoice) } : null,
+      deadline: NaN,
+      ended: true,
+    };
+  }
+
   function bidCard(it) {
+    const card = bidTile(it);
+    return it.invoice
+      ? h('div', { class: 'card-wrap' }, card, h('a', { class: 'link', href: it.invoice.href }, it.invoice.label || 'Invoice'))
+      : card;
+  }
+
+  function bidTile(it) {
     return h('a', { class: 'card', href: it.href },
       h('div', { class: 'well' },
         img(it.image, it.thumb),
@@ -443,7 +479,8 @@
         it.ended || isNaN(it.deadline) ? null : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
       h('div', { class: 'price-row' },
         h('span', { class: 'price' }, money(it.price)),
-        it.max && h('span', { class: 'muted' }, `Your max ${money(it.max)}`)),
+        it.max && h('span', { class: 'muted' }, `Your max ${money(it.max)}`),
+        it.when && h('span', { class: 'muted' }, it.when)),
       it.tone === 'losing' && !it.ended && it.min && h('div', { class: 'muted' }, `Next bid ${money(it.min)}`),
       h('div', { class: 'title' }, it.title),
       h('div', { class: 'chips' },
@@ -456,12 +493,13 @@
     const tabs = section ? $$('a[href]', section).map(a => ({ label: text(a), href: abs(a.getAttribute('href')), on: !!a.closest('li.active') })) : [];
 
     const tools = h('div', { class: 'tools' });
-    const sortSel = $('#SortFilterOptions');
-    if (sortSel?.form) {
+    for (const [id, label] of [['ViewFilterOption', 'View'], ['SortFilterOptions', 'Sort']]) {
+      const sel = $('#' + id);
+      if (!sel?.form) continue;
       tools.append(h('select', {
-        'aria-label': 'Sort',
-        onchange: e => { sortSel.value = e.target.value; sortSel.form.submit(); },
-      }, $$('option', sortSel).map(o => h('option', { value: o.value, selected: o.selected }, text(o)))));
+        'aria-label': label,
+        onchange: e => { sel.value = e.target.value; sel.form.submit(); },
+      }, $$('option', sel).map(o => h('option', { value: o.value, selected: o.selected }, text(o)))));
     }
 
     const cards = new Map();
@@ -470,8 +508,9 @@
       if (it.live) cards.set(it.id, { el, json: JSON.stringify(it) });
       return el;
     };
-    const parse = (doc, base) => $$('section[data-listingid]', doc)
+    const parse = (doc, base) => $$('section[data-listingid], .myaccount .list', doc)
       .map(s => {
+        if (!s.matches('section')) return parsePurchase(s, base);
         const it = parseBid(s, doc === document ? docClock : clockFor(doc), base);
         if (it) it.live = doc === document;
         return it;
