@@ -24,7 +24,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/icon16.png", "icons/icon32.png"],
+      "resources": ["icons/favicon.svg"],
       "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"]
     }
   ]

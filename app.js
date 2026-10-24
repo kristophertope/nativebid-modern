@@ -778,9 +778,7 @@
     shadow.append(header(), main, footer);
     document.body.append(host);
     $$('link[rel~="icon"]').forEach(l => l.remove());
-    for (const size of [16, 32]) {
-      document.head.append(h('link', { rel: 'icon', type: 'image/png', sizes: `${size}x${size}`, href: chrome.runtime.getURL(`icons/icon${size}.png`) }));
-    }
+    document.head.append(h('link', { rel: 'icon', type: 'image/svg+xml', href: chrome.runtime.getURL('icons/favicon.svg') }));
     tick();
     setInterval(() => { everySecond(); tick(); }, 1000);
   } catch (e) {
