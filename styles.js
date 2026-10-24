@@ -122,13 +122,20 @@ summary::-webkit-details-marker { display: none; }
 h1 { margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; overflow-wrap: anywhere; }
 .lede { margin-top: 6px; color: var(--muted); max-width: 70ch; }
 .tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.seg { display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
+.seg { position: relative; display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
 .seg a, .seg button { flex: none; white-space: nowrap; padding: 6px 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; font-weight: 500; }
 .seg .on { background: var(--ink); color: var(--bg); }
 select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 32px 20px; }
 .card { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.inv-list { display: grid; gap: 10px; max-width: 820px; }
+.inv { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; transition: border-color .15s; }
+.inv:hover { border-color: var(--muted); }
+.inv-id { font-weight: 650; margin-bottom: 2px; }
+.pill { padding: 4px 10px; border-radius: 999px; background: var(--line); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.pill.winning { background: var(--win); color: var(--win-ink); }
+.pill.losing { background: var(--warn); color: var(--warn-ink); }
 .card-wrap { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card-wrap > .link { align-self: flex-start; font-size: 13px; }
 .well { position: relative; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; background: var(--well); border-radius: var(--radius); }

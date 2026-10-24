@@ -488,10 +488,67 @@
         it.lot && h('span', { class: 'chip' }, `Lot ${it.lot}`)));
   }
 
-  function bidsPage() {
+  function accountTabs() {
     const section = $$('.myaccount__menu .nav-section-container').find(c => /bidding/i.test(text($('.nav-section-label', c))));
     const tabs = section ? $$('a[href]', section).map(a => ({ label: text(a), href: abs(a.getAttribute('href')), on: !!a.closest('li.active') })) : [];
+    if (!tabs.length) return null;
+    const seg = h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: t.on ? 'on' : '' }, t.label)));
+    requestAnimationFrame(() => {
+      const on = $('.on', seg);
+      if (on) seg.scrollLeft = on.offsetLeft + on.offsetWidth / 2 - seg.clientWidth / 2;
+    });
+    return h('div', { class: 'head' }, seg);
+  }
 
+  function parseInvoice(row, base) {
+    const a = $('a[href*="/Account/Invoice/"]', row);
+    if (!a) return null;
+    const cols = $$(':scope > .row > div', row);
+    const label = $('.label', row);
+    return {
+      id: text(a),
+      href: abs(a.getAttribute('href'), base),
+      date: text(cols[0]),
+      seller: text(cols[2]),
+      status: text(label),
+      tone: label?.classList.contains('label-success') ? 'winning' : label && /danger|warning/.test(label.className) ? 'losing' : '',
+      total: (/\$[\d,]+(?:\.\d+)?/.exec(text(cols[3])) || [])[0] || '',
+    };
+  }
+
+  function invoiceRow(it) {
+    return h('a', { class: 'inv', href: it.href },
+      h('div', null,
+        h('div', { class: 'inv-id' }, `Invoice #${it.id}`),
+        h('div', { class: 'muted' }, [it.date, it.seller].filter(Boolean).join(' · '))),
+      it.status && h('span', { class: `pill ${it.tone}` }, it.status),
+      h('span', { class: 'price' }, money(it.total)));
+  }
+
+  function invoicesPage() {
+    const url = new URL(location.href);
+    const cur = `${url.searchParams.get('sort') || 'CreatedDTTM'}:${(url.searchParams.get('descending') || 'True').toLowerCase()}`;
+    const sorts = [['CreatedDTTM:true', 'Newest first'], ['CreatedDTTM:false', 'Oldest first'], ['Total:true', 'Total, highest'], ['Total:false', 'Total, lowest']];
+    const sort = h('select', {
+      'aria-label': 'Sort',
+      onchange: e => {
+        const [k, d] = e.target.value.split(':');
+        url.searchParams.set('sort', k);
+        url.searchParams.set('descending', d === 'true' ? 'True' : 'False');
+        url.searchParams.delete('page');
+        location.href = url.href;
+      },
+    }, sorts.map(([v, l]) => h('option', { value: v, selected: v === cur }, l)));
+
+    const list = h('div', { class: 'inv-list' });
+    return h('main', { class: 'page' },
+      h('div', { class: 'head' }, h('h1', null, 'My bids'), h('div', { class: 'tools' }, sort)),
+      accountTabs(),
+      list,
+      feed({ container: list, parse: (doc, base) => $$('.myaccount .list', doc).map(r => parseInvoice(r, base)).filter(Boolean), render: invoiceRow, firstDoc: document, empty: 'No invoices yet.' }));
+  }
+
+  function bidsPage() {
     const tools = h('div', { class: 'tools' });
     for (const [id, label] of [['ViewFilterOption', 'View'], ['SortFilterOptions', 'Sort']]) {
       const sel = $('#' + id);
@@ -536,7 +593,7 @@
       h('div', { class: 'head' },
         h('h1', null, 'My bids'),
         tools),
-      tabs.length > 0 && h('div', { class: 'head' }, h('div', { class: 'seg' }, tabs.map(t => h('a', { href: t.href, class: t.on ? 'on' : '' }, t.label)))),
+      accountTabs(),
       grid,
       feed({ container: grid, parse, render, firstDoc: document, empty: 'Nothing here yet.' }));
   }
@@ -913,6 +970,7 @@
     if ($('h3.detail__title')) main = detailPage();
     else if (/^\/(listing\/details|event\/lotdetails)\//i.test(location.pathname)) main = missingLotPage();
     else if (/^\/account\/bidding\//i.test(location.pathname)) main = bidsPage();
+    else if (/^\/account\/invoice\/purchases/i.test(location.pathname)) main = invoicesPage();
     else if ($('.event-hp') || location.pathname === '/') main = homePage();
     else if ($('section[data-listingid]') || $('#SortFilterOptions') || /^\/(browse|search|listing|event\/details)/i.test(location.pathname)) main = resultsPage();
     else throw new Error('Unrecognized page');
