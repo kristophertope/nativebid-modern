@@ -191,8 +191,6 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .strip img { width: 100%; height: 100%; object-fit: cover; }
 .view-lots { align-self: flex-start; color: var(--accent); font-weight: 600; }
 
-.crumbs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; color: var(--muted); font-size: 14px; }
-.crumbs a:hover { color: var(--ink); }
 .detail { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: 44px; align-items: start; }
 .gallery { position: sticky; top: 84px; min-width: 0; }
 .stage { position: relative; overflow: hidden; background: var(--well); border-radius: 20px; }
@@ -285,7 +283,6 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 @media (max-width: 720px) {
   .bar { flex-wrap: wrap; gap: 10px; padding: 10px 16px; }
   .search { order: 3; flex-basis: 100%; max-width: none; }
-  .crumbs { gap: 8px; margin-bottom: 14px; }
   .page { padding: 20px 16px 80px; }
   h1, .info h1 { font-size: 24px; }
   .event { grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 12px; }

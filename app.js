@@ -678,7 +678,6 @@
     const rawTitle = text($('h3.detail__title'));
     const { title, msrp } = splitTitle(rawTitle);
     const lotText = text($('.detail__next-prev-lot > span'));
-    const eventA = $('h1.event-title a');
     const listingId = $('#ListingID')?.value;
     const listingType = $('#ListingType')?.value || 'Auction';
 
@@ -941,8 +940,6 @@
     render();
 
     return h('main', { class: 'page' },
-      h('div', { class: 'crumbs' },
-        eventA && h('a', { href: abs(eventA.getAttribute('href')) }, '← ', text(eventA))),
       h('div', { class: 'detail' },
         images.length ? gallery(images) : h('div', { class: 'gallery' }, h('div', { class: 'stage' }, h('div', { class: 'slide' }))),
         h('div', { class: 'info' },
