@@ -238,7 +238,7 @@
     return a && /»|next/i.test(text(a)) ? abs(a.getAttribute('href'), base) : '';
   }
 
-  function feed({ container, parse, render, firstDoc, empty }) {
+  function feed({ container, parse, render, firstDoc, empty, keep = () => true }) {
     const key = 'nbx:feed:' + location.href;
     const seen = new Set();
     const loaded = [];
@@ -248,12 +248,14 @@
     let busy = false;
 
     function add(doc, base) {
+      let stop = false;
       for (const item of parse(doc, base)) {
+        if (!keep(item)) { stop = true; continue; }
         if (seen.has(item.id)) continue;
         seen.add(item.id);
         container.append(render(item));
       }
-      next = nextPage(doc, base);
+      next = stop ? '' : nextPage(doc, base);
       tick();
     }
 
@@ -373,6 +375,7 @@
         thumb,
         image: large(thumb),
         status: text(visible('.event-row__status > div')),
+        closed: !!visible('.event-row__status--closed'),
         label: text(visible('.event-row__time-label > div')),
         deadline: timed ? clock(timed.getAttribute('data-action-time')) : NaN,
         date: dated ? fmtDate(clock(dated.getAttribute('data-initial-dttm'))) : '',
@@ -410,7 +413,7 @@
         h('a', { href: '/Browse' }, 'All lots'),
         cats.map(c => h('a', { href: c.href }, c.name, h('small', null, c.count.toLocaleString())))),
       list,
-      feed({ container: list, parse: parseEvents, render: eventCard, firstDoc: document, empty: 'No auctions here right now.' }));
+      feed({ container: list, parse: parseEvents, render: eventCard, firstDoc: document, empty: 'No auctions here right now.', keep: ev => filter === 'closed' || !ev.closed }));
   }
 
   function parseBid(s, clock, base) {
