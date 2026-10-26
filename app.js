@@ -69,6 +69,7 @@
     return el;
   }
 
+  const srcOf = el => el && (el.getAttribute('data-nbx-src') || el.getAttribute('src'));
   const medium = src => (src || '').replace(/_(thumbfit|thumbcrop|largesize)\.(jpe?g|png|webp)/i, '_fullsize.$2');
   const large = src => (src || '').replace(/_(thumbfit|thumbcrop|fullsize)\.(jpe?g|png|webp)/i, '_largesize.$2');
 
@@ -199,7 +200,7 @@
       if (!a) return null;
       const raw = text(a);
       const { title, msrp } = splitTitle(raw);
-      const thumb = abs($('.img-container img', s)?.getAttribute('src'), base);
+      const thumb = abs(srcOf($('.img-container img', s)), base);
       const endedLabel = $('.awe-rt-ShowOnEnd.status-type', s);
       const deadline = clock($('[data-epoch="ending"]', s)?.getAttribute('data-action-time'));
       return {
@@ -393,7 +394,7 @@
       const visible = sel => $$(sel, ev).find(el => !el.classList.contains('awe-hidden'));
       const timed = $('[data-action-time]', ev);
       const dated = $('[data-initial-dttm]', ev);
-      const thumb = abs($('.event-row__img img', ev)?.getAttribute('src'), base);
+      const thumb = abs(srcOf($('.event-row__img img', ev)), base);
       return {
         id: ev.getAttribute('data-eventid') || a.getAttribute('href'),
         href: abs(a.getAttribute('href'), base),
@@ -406,7 +407,7 @@
         label: text(visible('.event-row__time-label > div')),
         deadline: timed ? clock(timed.getAttribute('data-action-time')) : NaN,
         date: dated ? fmtDate(clock(dated.getAttribute('data-initial-dttm'))) : '',
-        lots: $$('.event-row__thumbnails a', ev).map(l => ({ href: abs(l.getAttribute('href'), base), src: abs($('img', l)?.getAttribute('src'), base) })),
+        lots: $$('.event-row__thumbnails a', ev).map(l => ({ href: abs(l.getAttribute('href'), base), src: abs(srcOf($('img', l)), base) })),
       };
     }).filter(Boolean);
   }
@@ -449,7 +450,7 @@
     if (!a) return null;
     const raw = text(a);
     const { title, msrp } = splitTitle(raw);
-    const thumb = abs($('.img-container img, img', s)?.getAttribute('src'), base);
+    const thumb = abs(srcOf($('.img-container img, img', s)), base);
     const deadline = clock($('[data-epoch="ending"]', s)?.getAttribute('data-action-time'));
     const ended = $$('.awe-rt-ShowOnEnd', s).some(el => !el.classList.contains('awe-hidden')) || (!isNaN(deadline) && deadline <= Date.now());
     const statusEl = $('.InlineContextualStatus', s);
@@ -486,7 +487,7 @@
     if (!a) return null;
     const raw = text(a);
     const { title, msrp } = splitTitle(raw);
-    const thumb = abs($('img', row)?.getAttribute('src'), base);
+    const thumb = abs(srcOf($('img', row)), base);
     const listingId = (/\/Listing\/Details\/(\d+)/i.exec($('a[href*="/Listing/Details/"]', row)?.getAttribute('href') || '') || [])[1];
     const sold = /(\d+\/\d+\/\d+)\s+(\d+:\d+)(?::\d+)?\s*(AM|PM)?/i.exec(text(a.closest('p')).replace(raw, ''));
     const amounts = $$(':scope > .row .row > div', row).map(text).filter(t => /\$/.test(t));
@@ -711,10 +712,10 @@
     const images = thumbImgs.length
       ? thumbImgs.map(t => {
         const li = t.closest('li');
-        const full = abs($('a[data-lightbox]', li)?.getAttribute('href') || t.getAttribute('data-full-size-src') || t.getAttribute('src'));
-        return { full: large(full), thumb: abs(t.getAttribute('src')) };
+        const full = abs($('a[data-lightbox]', li)?.getAttribute('href') || t.getAttribute('data-full-size-src') || srcOf(t));
+        return { full: large(full), thumb: abs(srcOf(t)) };
       })
-      : $('#previewimg') ? [{ full: large(abs($('#previewimg').getAttribute('src'))), thumb: abs($('#previewimg').getAttribute('src')) }] : [];
+      : $('#previewimg') ? [{ full: large(abs(srcOf($('#previewimg')))), thumb: abs(srcOf($('#previewimg'))) }] : [];
 
     const read = () => {
       const maxEl = $('.detail__biddermax');
@@ -1070,5 +1071,6 @@
     console.error('[NativeBid Modern] falling back to original page', e);
     host.remove();
     html.classList.remove('nbx');
+    globalThis.nbxBoot?.restore?.();
   }
 })();
