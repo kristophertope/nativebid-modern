@@ -400,7 +400,8 @@
   function homePage() {
     const viewFilter = href => (new URL(href).searchParams.get('ViewFilter') || 'Current').toLowerCase();
     const filter = viewFilter(location.href);
-    const tabs = uniqBy($$('.eFilter a[href]')
+    const filterLinks = $$('.eFilter.hidden-xs a[href]');
+    const tabs = uniqBy((filterLinks.length ? filterLinks : $$('.eFilter a[href]'))
       .map(a => ({ href: abs(a.getAttribute('href')), label: text(a).replace(/\s*auctions$/i, '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) })), t => t.href);
     const cats = parseCats('.categories--vertical a[href]', c => c.count > 0);
 
