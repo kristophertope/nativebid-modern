@@ -65,7 +65,7 @@
   function cardImg(src, thumb) {
     const el = img(src, thumb, { class: 'ph' });
     if (thumb && thumb !== src) el.style.backgroundImage = `url("${thumb}")`;
-    el.addEventListener('load', () => el.classList.remove('ph'), { once: true });
+    el.addEventListener('load', () => { el.classList.remove('ph'); el.style.backgroundImage = ''; }, { once: true });
     return el;
   }
 
