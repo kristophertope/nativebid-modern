@@ -193,9 +193,6 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 
 .crumbs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; color: var(--muted); font-size: 14px; }
 .crumbs a:hover { color: var(--ink); }
-.crumbs .spacer { flex: 1; }
-.lotnav { display: inline-flex; gap: 6px; }
-.lotnav button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; }
 .detail { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: 44px; align-items: start; }
 .gallery { position: sticky; top: 84px; min-width: 0; }
 .stage { position: relative; overflow: hidden; background: var(--well); border-radius: 20px; }

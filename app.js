@@ -937,18 +937,12 @@
     }
 
     const seller = text($('.detail__user-summary strong'));
-    const prevBtn = $('.GoToPrevLot');
-    const nextBtn = $('.GoToNextLot');
 
     render();
 
     return h('main', { class: 'page' },
       h('div', { class: 'crumbs' },
-        eventA && h('a', { href: abs(eventA.getAttribute('href')) }, '← ', text(eventA)),
-        h('span', { class: 'spacer' }),
-        (prevBtn || nextBtn) && h('div', { class: 'lotnav' },
-          prevBtn && h('button', { onclick: () => prevBtn.click() }, '‹ Prev'),
-          nextBtn && h('button', { onclick: () => nextBtn.click() }, 'Next ›'))),
+        eventA && h('a', { href: abs(eventA.getAttribute('href')) }, '← ', text(eventA))),
       h('div', { class: 'detail' },
         images.length ? gallery(images) : h('div', { class: 'gallery' }, h('div', { class: 'stage' }, h('div', { class: 'slide' }))),
         h('div', { class: 'info' },
