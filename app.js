@@ -62,6 +62,14 @@
     });
   }
 
+  function cardImg(src, thumb) {
+    const el = img(src, thumb, { class: 'ph' });
+    if (thumb && thumb !== src) el.style.backgroundImage = `url("${thumb}")`;
+    el.addEventListener('load', () => el.classList.remove('ph'), { once: true });
+    return el;
+  }
+
+  const medium = src => (src || '').replace(/_(thumbfit|thumbcrop|largesize)\.(jpe?g|png|webp)/i, '_fullsize.$2');
   const large = src => (src || '').replace(/_(thumbfit|thumbcrop|fullsize)\.(jpe?g|png|webp)/i, '_largesize.$2');
 
   function money(v) {
@@ -202,7 +210,7 @@
         lot: (/^Lot\s+(\S+)/i.exec(raw) || [])[1] || '',
         subtitle: text($('h3.subtitle', s)),
         thumb,
-        image: large(thumb),
+        image: medium(thumb),
         price: text($('.awe-rt-CurrentPrice.price .NumberPart', s) || $('.awe-rt-CurrentPrice .NumberPart', s)),
         bids: text($('.awe-rt-AcceptedListingActionCount', s)),
         type: text($('.status-type.label-primary', s)),
@@ -217,7 +225,7 @@
     const bids = bidsLabel(it.bids);
     return h('a', { class: 'card' + (it.ended ? ' ended' : ''), href: it.href },
       h('div', { class: 'well' },
-        img(it.image, it.thumb),
+        cardImg(it.image, it.thumb),
         isNaN(it.deadline)
           ? (it.ended ? h('span', { class: 'pill-time' }, it.sold ? 'Sold' : 'Ended') : null)
           : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
@@ -247,6 +255,7 @@
     const sentinel = h('div');
     let next = '';
     let busy = false;
+    let ahead = null;
 
     function add(doc, base) {
       let stop = false;
@@ -260,6 +269,20 @@
       tick();
     }
 
+    function fetchPage(url) {
+      return fetch(url, { credentials: 'include' }).then(res => {
+        if (!res.ok) throw new Error(res.status);
+        return res.text();
+      });
+    }
+
+    function prefetch() {
+      if (!next || ahead?.url === next) return;
+      const p = fetchPage(next);
+      p.catch(() => { if (ahead?.p === p) ahead = null; });
+      ahead = { url: next, p };
+    }
+
     function save() {
       try { sessionStorage.setItem(key, JSON.stringify({ pages: loaded, y: scrollY })); } catch {}
     }
@@ -269,10 +292,9 @@
     }
 
     async function load(url) {
-      const res = await fetch(url, { credentials: 'include' });
-      if (!res.ok) throw new Error(res.status);
-      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-      add(doc, url);
+      const html = await (ahead?.url === url ? ahead.p : fetchPage(url));
+      ahead = null;
+      add(new DOMParser().parseFromString(html, 'text/html'), url);
       loaded.push(url);
     }
 
@@ -283,6 +305,7 @@
       try {
         await load(next);
         save();
+        prefetch();
       } catch {
         busy = false;
         status.replaceChildren('Couldn’t load more lots.', h('button', { class: 'btn', onclick: more }, 'Retry'));
@@ -294,6 +317,7 @@
     }
 
     add(firstDoc, location.href);
+    $$('img', container).slice(0, 8).forEach(el => { el.loading = 'eager'; el.fetchPriority = 'high'; });
     setStatus();
 
     const nav = performance.getEntriesByType('navigation')[0];
@@ -308,10 +332,12 @@
         }
         busy = false;
         setStatus();
+        prefetch();
         requestAnimationFrame(() => scrollTo(0, saved.y || 0));
       })();
     } else {
       try { sessionStorage.removeItem(key); } catch {}
+      prefetch();
     }
 
     let t;
@@ -374,7 +400,7 @@
         title: text(a),
         summary: text($('.event-row__summary', ev)),
         thumb,
-        image: large(thumb),
+        image: medium(thumb),
         status: text(visible('.event-row__status > div')),
         closed: !!visible('.event-row__status--closed'),
         label: text(visible('.event-row__time-label > div')),
@@ -387,7 +413,7 @@
 
   function eventCard(ev) {
     return h('article', { class: 'event' },
-      h('a', { class: 'well', href: ev.href }, img(ev.image, ev.thumb)),
+      h('a', { class: 'well', href: ev.href }, cardImg(ev.image, ev.thumb)),
       h('div', { class: 'event-body' },
         h('div', { class: 'status-line' },
           ev.status && h('span', { class: 'status' }, ev.status),
@@ -443,7 +469,7 @@
       msrp,
       lot: (/^Lot\s+(\S+)/i.exec(raw) || [])[1] || '',
       thumb,
-      image: large(thumb),
+      image: medium(thumb),
       price: text($('.NumberPart', priceEl || s)),
       max: text($('.awe-rt-MaxBid .NumberPart', s)),
       min: text($('.Bidding_Listing_MinPrice .NumberPart', s)),
@@ -473,7 +499,7 @@
       msrp,
       lot: (/^Lot\s+(\S+)/i.exec(raw) || [])[1] || '',
       thumb,
-      image: large(thumb),
+      image: medium(thumb),
       price: amounts.pop() || '',
       status: page.endsWith('/won') ? 'Won' : page.endsWith('/lost') ? 'Not won' : '',
       tone: page.endsWith('/won') ? 'winning' : '',
@@ -494,7 +520,7 @@
   function bidTile(it) {
     return h('a', { class: 'card', href: it.href },
       h('div', { class: 'well' },
-        img(it.image, it.thumb),
+        cardImg(it.image, it.thumb),
         it.status && h('span', { class: `pill-status ${it.tone}` }, it.status),
         it.ended || isNaN(it.deadline) ? null : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
       h('div', { class: 'price-row' },

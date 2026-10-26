@@ -147,6 +147,7 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .card-wrap > .link { align-self: flex-start; font-size: 13px; }
 .well { position: relative; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; background: var(--well); border-radius: var(--radius); }
 .well img { width: 100%; height: 100%; object-fit: contain; transition: transform .4s cubic-bezier(.2, .7, .2, 1); }
+.well img.ph { background: center / contain no-repeat; }
 .card:hover .well img { transform: scale(1.04); }
 .pill-time {
   position: absolute;
