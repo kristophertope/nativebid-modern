@@ -146,6 +146,7 @@
       : signOut.length > 0
         ? [['Details', '/Account/AccountSettings'], ['Addresses', '/Account/AddressManagement'], ['Credit Cards', '/Account/StripeCardManagement'], ['Password', '/Account/ChangePassword']].map(([label, href]) => ({ label, href: abs(href) }))
         : [];
+    if (accountLinks.length > 0 && !accountLinks.some(l => /\/page\/schedule-pick-up/i.test(l.href))) accountLinks.push({ label: 'Pick-up', href: abs('/page/schedule-pick-up') });
     const links = list => list.map(l => h('a', { href: l.href }, l.label));
 
     const q = new URL(location.href).searchParams.get('FullTextQuery') || '';
@@ -984,12 +985,49 @@
           h('div', { class: 'lede' }, msg || 'It may have been removed, or the link may be wrong.', ' ', h('a', { class: 'link', href: '/Browse' }, 'Browse all lots')))));
   }
 
+  function pickupPage() {
+    const body = $('main .row .col-xs-12') || $('main .container');
+    const clean = el => text(el).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    const linkOf = (a, label) => {
+      const href = abs(a.getAttribute('href'));
+      const ext = new URL(href).origin !== location.origin;
+      return h('a', { class: 'btn primary', href, ...(ext ? { target: '_blank', rel: 'noopener' } : {}) }, label || clean(a));
+    };
+    let title = '';
+    const options = [];
+    for (const p of $$('p', body)) {
+      const t = clean(p);
+      if (!t) continue;
+      const a = $('a[href]', p);
+      const num = /^\d+\)\s*(.*)$/.exec(t);
+      const item = /^[a-z]\)\s*(.*)$/i.exec(t);
+      if (num) {
+        const hours = (/\(([^)]+)\)/.exec(num[1]) || [])[1] || '';
+        const name = a ? clean(a) : num[1].replace(/\([^)]*\)/, '').trim();
+        options.push({ name, hours: hours.replace(/\s*-\s*/g, '–').replace(/:\s*/, ': '), points: [], actions: a ? [linkOf(a, 'View instructions')] : [] });
+      } else if (item && options.length) {
+        const cur = options[options.length - 1];
+        if (a) cur.actions.push(linkOf(a));
+        else cur.points.push(item[1].replace(/\.$/, ''));
+      } else if (!title && !options.length) title = t;
+    }
+    if (!options.length) throw new Error('Unrecognized pick-up page');
+    return h('main', { class: 'page' },
+      h('div', { class: 'head' }, h('h1', null, title || 'Pick-up')),
+      h('div', { class: 'pickup' }, options.map(o => h('section', { class: 'pickup-card' },
+        h('h2', null, o.name),
+        o.hours && h('span', { class: 'chip strong' }, o.hours),
+        o.points.length > 0 && h('ul', null, o.points.map(x => h('li', null, x))),
+        o.actions.length > 0 && h('div', { class: 'pickup-actions' }, o.actions)))));
+  }
+
   try {
     let main;
     if ($('h3.detail__title')) main = detailPage();
     else if (/^\/(listing\/details|event\/lotdetails)\//i.test(location.pathname)) main = missingLotPage();
     else if (/^\/account\/bidding\//i.test(location.pathname)) main = bidsPage();
     else if (/^\/account\/invoice\/purchases/i.test(location.pathname)) main = invoicesPage();
+    else if (/^\/page\/schedule-pick-up\/?$/i.test(location.pathname)) main = pickupPage();
     else if ($('.event-hp') || location.pathname === '/') main = homePage();
     else if ($('section[data-listingid]') || $('#SortFilterOptions') || /^\/(browse|search|listing|event\/details)/i.test(location.pathname)) main = resultsPage();
     else throw new Error('Unrecognized page');

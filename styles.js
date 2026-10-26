@@ -137,6 +137,12 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .pill { padding: 4px 10px; border-radius: 999px; background: var(--line); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .pill.winning { background: var(--win); color: var(--win-ink); }
 .pill.losing { background: var(--warn); color: var(--warn-ink); }
+.pickup { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; max-width: 980px; }
+.pickup-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+.pickup-card h2 { margin: 0; font-size: 19px; letter-spacing: -0.01em; }
+.pickup-card ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
+.pickup-actions { margin-top: auto; padding-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
+.pickup-actions .btn { display: inline-flex; align-items: center; height: 44px; }
 .card-wrap { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card-wrap > .link { align-self: flex-start; font-size: 13px; }
 .well { position: relative; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; background: var(--well); border-radius: var(--radius); }
