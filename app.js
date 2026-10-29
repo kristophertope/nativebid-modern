@@ -773,7 +773,46 @@
     const priceEl = h('div', { class: 'big' });
     const priceLabel = h('div', { class: 'label' }, 'Current bid');
     const historyHref = abs($('a.bid-history, a[href*="/Listing/History/"]')?.getAttribute('href'));
-    const bidsEl = historyHref ? h('a', { class: 'link', href: historyHref }) : h('span', { class: 'muted' });
+    const bidsEl = historyHref ? h('button', { class: 'link history-toggle', type: 'button', 'aria-expanded': 'false', onclick: () => toggleHistory() }) : h('span', { class: 'muted' });
+    const historyEl = h('div', { class: 'history hidden' });
+    let historyFor = null;
+
+    const shortWhen = raw => {
+      const m = /(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)(?::\d+)?\s*(AM|PM)/i.exec(raw);
+      if (!m) return raw;
+      const month = new Date(+m[3], +m[1] - 1, 1).toLocaleString(undefined, { month: 'short' });
+      return `${month} ${+m[2]}, ${+m[4]}:${m[5]} ${m[6].toUpperCase()}`;
+    };
+
+    async function loadHistory() {
+      historyFor = state.bids;
+      historyEl.replaceChildren(h('div', { class: 'muted' }, 'Loading bid history…'));
+      try {
+        const res = await fetch(historyHref, { credentials: 'include' });
+        if (!res.ok) throw new Error(res.status);
+        if (/\/account\/logon/i.test(res.url)) {
+          historyEl.replaceChildren(h('a', { class: 'link', href: abs('/Account/LogOn?returnUrl=' + encodeURIComponent(location.pathname)) }, 'Sign in to see bid history'));
+          return;
+        }
+        const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        const rows = $$('.table-bidHistory tbody tr', doc).map(tr => $$('td', tr).map(text)).filter(r => r.length >= 2);
+        historyEl.replaceChildren(rows.length
+          ? h('ol', { class: 'history-list' }, rows.map(([when, amount, kind], i) => h('li', { class: i === 0 ? 'top' : '' },
+              h('span', { class: 'history-amount' }, money(amount) || amount),
+              kind && !/^bid$/i.test(kind) && h('span', { class: 'chip' }, kind),
+              h('span', { class: 'muted' }, shortWhen(when)))))
+          : h('div', { class: 'muted' }, 'No bids yet.'));
+      } catch {
+        historyFor = null;
+        historyEl.replaceChildren(h('span', { class: 'muted' }, 'Couldn’t load bid history. '), h('button', { class: 'link', type: 'button', onclick: loadHistory }, 'Retry'));
+      }
+    }
+
+    function toggleHistory() {
+      const open = historyEl.classList.toggle('hidden') === false;
+      bidsEl.setAttribute('aria-expanded', String(open));
+      if (open && historyFor !== state.bids) loadHistory();
+    }
     const reserveEl = h('div', { class: 'note' });
     const mineEl = h('div', { class: 'mine hidden' });
     const noticeEl = h('div', { class: 'mine hidden' });
@@ -929,6 +968,7 @@
       priceEl.textContent = money(state.price) || '—';
       priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : state.sold ? 'Sold for' : 'Final price';
       bidsEl.textContent = bidsLabel(state.bids);
+      if (historyHref && historyFor !== null && historyFor !== state.bids && !historyEl.classList.contains('hidden')) loadHistory();
       reserveEl.textContent = state.reserve;
       const tone = /not the high bidder|not currently winning|did not win|beating your/i.test(state.notice) ? 'losing'
         : /currently winning|have won/i.test(state.notice) ? 'winning' : '';
@@ -1007,6 +1047,7 @@
           h('div', { class: 'buy' },
             h('div', { class: 'buy-top' }, statusEl, clockEl),
             h('div', { class: 'price-block' }, h('div', null, priceLabel, priceEl), bidsEl),
+            historyEl,
             reserveEl,
             noticeEl,
             mineEl,

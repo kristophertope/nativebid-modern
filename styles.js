@@ -238,6 +238,16 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .clock { font-weight: 600; font-variant-numeric: tabular-nums; }
 .clock.soon { color: var(--warn); }
 .price-block { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.history-toggle { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+.history-toggle::after { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 2px 3px 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .2s; }
+.history-toggle[aria-expanded="true"]::after { margin-bottom: -1px; transform: rotate(-135deg); }
+.history { padding: 4px 0 2px; border-top: 1px solid var(--line); }
+.history-list { margin: 0; padding: 0; list-style: none; max-height: 280px; overflow-y: auto; }
+.history-list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.history-list li:last-child { border-bottom: 0; }
+.history-list .muted { margin-left: auto; }
+.history-amount { font-weight: 650; }
+.history-list li.top .history-amount { color: var(--accent); }
 .label { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
 .big { font-size: 42px; font-weight: 750; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .link { color: var(--accent); font-weight: 600; }
