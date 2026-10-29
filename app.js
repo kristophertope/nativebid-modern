@@ -257,6 +257,8 @@
     let next = '';
     let busy = false;
     let ahead = null;
+    let restoring = false;
+    try { history.scrollRestoration = 'manual'; } catch {}
 
     function add(doc, base) {
       let stop = false;
@@ -264,7 +266,9 @@
         if (!keep(item)) { stop = true; continue; }
         if (seen.has(item.id)) continue;
         seen.add(item.id);
-        container.append(render(item));
+        const el = render(item);
+        el.dataset.feedId = item.id;
+        container.append(el);
       }
       next = stop ? '' : nextPage(doc, base);
       tick();
@@ -285,18 +289,37 @@
     }
 
     function save() {
-      try { sessionStorage.setItem(key, JSON.stringify({ pages: loaded, y: scrollY })); } catch {}
+      if (restoring) return;
+      const top = shadowTop();
+      const anchor = Array.from(container.children).find(el => el.getBoundingClientRect().bottom > top);
+      const state = { pages: loaded, y: scrollY };
+      if (anchor) Object.assign(state, { anchor: anchor.dataset.feedId, offset: anchor.getBoundingClientRect().top });
+      try { sessionStorage.setItem(key, JSON.stringify(state)); } catch {}
+    }
+
+    function shadowTop() {
+      return container.getRootNode().querySelector('.top')?.getBoundingClientRect().bottom || 0;
+    }
+
+    function jump(state) {
+      const el = state.anchor && Array.from(container.children).find(c => c.dataset.feedId === state.anchor);
+      if (el) scrollBy(0, el.getBoundingClientRect().top - state.offset);
+      else scrollTo(0, state.y || 0);
     }
 
     function setStatus() {
       status.replaceChildren(busy ? 'Loading more…' : next ? '' : seen.size ? 'You’ve reached the end.' : empty);
     }
 
+    function place(html, url) {
+      add(new DOMParser().parseFromString(html, 'text/html'), url);
+      loaded.push(url);
+    }
+
     async function load(url) {
       const html = await (ahead?.url === url ? ahead.p : fetchPage(url));
       ahead = null;
-      add(new DOMParser().parseFromString(html, 'text/html'), url);
-      loaded.push(url);
+      place(html, url);
     }
 
     async function more() {
@@ -327,14 +350,19 @@
     if (saved && nav?.type === 'back_forward' && saved.pages?.length) {
       (async () => {
         busy = true;
+        restoring = true;
         setStatus();
-        for (const url of saved.pages) {
-          try { await load(url); } catch { break; }
+        const pages = await Promise.allSettled(saved.pages.map(fetchPage));
+        for (const [i, r] of pages.entries()) {
+          if (r.status !== 'fulfilled') break;
+          place(r.value, saved.pages[i]);
         }
         busy = false;
         setStatus();
-        prefetch();
-        requestAnimationFrame(() => scrollTo(0, saved.y || 0));
+        requestAnimationFrame(() => {
+          jump(saved);
+          requestAnimationFrame(() => { jump(saved); restoring = false; prefetch(); });
+        });
       })();
     } else {
       try { sessionStorage.removeItem(key); } catch {}
