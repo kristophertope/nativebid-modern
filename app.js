@@ -978,10 +978,17 @@
       if (!isNaN(min)) startBid(quick, min);
     });
 
+    function currentMax() {
+      const max = num(state.max);
+      return !isNaN(max) && !(max < num(state.min)) ? max : NaN;
+    }
+
     function submitMax() {
       const amount = num(input.value);
       const min = num(state.min);
+      const max = currentMax();
       if (isNaN(amount)) { err.textContent = 'Enter an amount.'; return; }
+      if (!isNaN(max) && amount <= max) { err.textContent = `Your new max bid must be more than ${money(max)}.`; return; }
       if (!isNaN(min) && amount < min) { err.textContent = `Your max bid must be at least ${money(min)}.`; return; }
       startBid(maxBtn, amount);
     }
@@ -1021,6 +1028,7 @@
       mineEl.classList.toggle('hidden', !maxLine || !!state.notice);
       quick.textContent = buttonLabel(quick, !state.min ? 'Bid' : tone === 'winning' ? `Raise max to ${money(state.min)}` : `Bid ${money(state.min)}`);
       quick.classList.toggle('primary', tone !== 'winning');
+      quick.classList.toggle('hidden', !isNaN(currentMax()) && pending?.btn !== quick);
       const ready = pending?.phase === 'ready';
       quick.classList.toggle('armed', ready && pending.btn === quick);
       maxBtn.textContent = buttonLabel(maxBtn, 'Set max bid');
@@ -1028,7 +1036,7 @@
       quick.disabled = maxBtn.disabled = busy();
       feeEl.textContent = ready ? `${pending.fees} Tap again to place your bid.`.trim() : '';
       feeEl.classList.toggle('hidden', !ready);
-      if (!input.value && state.min) input.placeholder = `${money(state.min)} or more`;
+      if (!input.value && state.min) input.placeholder = isNaN(currentMax()) ? `${money(state.min)} or more` : `More than ${money(state.max)}`;
       controls.classList.toggle('hidden', !state.open || !listingId);
       closedEl.classList.toggle('hidden', state.open || !!state.notice);
       tick();
