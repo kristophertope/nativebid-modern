@@ -102,6 +102,7 @@
   }
 
   const docClock = clockFor(document);
+  const endOf = (el, clock) => (el ? +el.getAttribute('data-nbx-end') || clock(el.getAttribute('data-action-time')) : NaN);
 
   const fmtDate = ms => (isNaN(ms) ? '' : new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
 
@@ -128,15 +129,52 @@
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.append(h('style', null, globalThis.NBX_CSS || ''));
 
+  const extendedLots = new Map();
+  const closedLots = new Set();
+  const checking = new Map();
+
+  function onScreen(el) {
+    const card = el.closest('.card');
+    if (!card) return true;
+    const r = card.getBoundingClientRect();
+    return r.bottom > 0 && r.top < innerHeight;
+  }
+
+  async function verify(lid, el) {
+    const now = Date.now();
+    if ((checking.get(lid) || 0) > now || checking.size >= 4 && !checking.has(lid) || !onScreen(el)) return;
+    checking.set(lid, Infinity);
+    try {
+      const res = await fetch('/RealTime/GetTimeRemaining', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: +lid }),
+      });
+      if (!res.ok) throw new Error(res.status);
+      const ms = (+(await res.json()).secondsRemaining || 0) * 1000;
+      if (ms > 1000) extendedLots.set(lid, Date.now() + ms);
+      else closedLots.add(lid);
+      checking.delete(lid);
+    } catch {
+      checking.set(lid, Date.now() + 5000);
+    }
+    everySecond();
+    tick();
+  }
+
   function tick() {
     const now = Date.now();
     for (const el of shadow.querySelectorAll('[data-deadline]')) {
+      const lid = el.dataset.lid;
+      if (lid && extendedLots.get(lid) > +el.dataset.deadline) el.dataset.deadline = extendedLots.get(lid);
       const left = +el.dataset.deadline - now;
-      const label = remaining(left);
-      if (el.textContent === label) continue;
-      el.textContent = label;
-      el.classList.toggle('soon', left > 0 && left < 5 * 60 * 1000);
-      el.closest('.card')?.classList.toggle('ended', left <= 0);
+      const done = left <= 0 && (!lid || closedLots.has(lid));
+      if (left <= 0 && !done) verify(lid, el);
+      const label = left > 0 ? remaining(left) : done ? 'Ended' : 'Ending…';
+      el.classList.toggle('soon', !done && left < 5 * 60 * 1000);
+      el.closest('.card')?.classList.toggle('ended', done);
+      if (el.textContent !== label) el.textContent = label;
     }
   }
 
@@ -202,7 +240,7 @@
       const { title, msrp } = splitTitle(raw);
       const thumb = abs(srcOf($('.img-container img', s)), base);
       const endedLabel = $('.awe-rt-ShowOnEnd.status-type', s);
-      const deadline = clock($('[data-epoch="ending"]', s)?.getAttribute('data-action-time'));
+      const deadline = endOf($('[data-epoch="ending"]', s), clock);
       return {
         id: s.getAttribute('data-listingid'),
         href: abs(a.getAttribute('href'), base),
@@ -229,7 +267,7 @@
         cardImg(it.image, it.thumb),
         isNaN(it.deadline)
           ? (it.ended ? h('span', { class: 'pill-time' }, it.sold ? 'Sold' : 'Ended') : null)
-          : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
+          : h('span', { class: 'pill-time', 'data-deadline': it.deadline, 'data-lid': it.id })),
       h('div', { class: 'price-row' },
         h('span', { class: 'price' }, money(it.price)),
         bids && h('span', { class: 'muted' }, bids)),
@@ -479,8 +517,8 @@
     const raw = text(a);
     const { title, msrp } = splitTitle(raw);
     const thumb = abs(srcOf($('.img-container img, img', s)), base);
-    const deadline = clock($('[data-epoch="ending"]', s)?.getAttribute('data-action-time'));
-    const ended = $$('.awe-rt-ShowOnEnd', s).some(el => !el.classList.contains('awe-hidden')) || (!isNaN(deadline) && deadline <= Date.now());
+    const deadline = endOf($('[data-epoch="ending"]', s), clock);
+    const ended = $$('.awe-rt-ShowOnEnd', s).some(el => !el.classList.contains('awe-hidden')) || closedLots.has(s.getAttribute('data-listingid'));
     const statusEl = $('.InlineContextualStatus', s);
     const priceEl = $('.awe-rt-CurrentPrice', s);
     let status = hidden(statusEl) ? '' : text(statusEl);
@@ -551,7 +589,7 @@
       h('div', { class: 'well' },
         cardImg(it.image, it.thumb),
         it.status && h('span', { class: `pill-status ${it.tone}` }, it.status),
-        it.ended || isNaN(it.deadline) ? null : h('span', { class: 'pill-time', 'data-deadline': it.deadline })),
+        it.ended || isNaN(it.deadline) ? null : h('span', { class: 'pill-time', 'data-deadline': it.deadline, 'data-lid': it.id })),
       h('div', { class: 'price-row' },
         h('span', { class: 'price' }, money(it.price)),
         it.max && h('span', { class: 'muted' }, `Your max ${money(it.max)}`),
@@ -748,7 +786,7 @@
     const read = () => {
       const maxEl = $('.detail__biddermax');
       const submit = $('#SubmitBid');
-      const deadline = clock($('[data-epoch="ending"]', box)?.getAttribute('data-action-time'));
+      const deadline = endOf($('[data-epoch="ending"]', box), clock);
       return {
         price: text($('.detail__price .awe-rt-CurrentPrice .NumberPart', box) || $('.closed-details .NumberPart') || $('.awe-rt-CurrentPrice .NumberPart')),
         sold: !hidden($('.closed-details .sold')),
@@ -764,12 +802,12 @@
             .filter(Boolean),
         )].join(' '),
         deadline,
-        open: !!submit && !hidden(submit) && (isNaN(deadline) || deadline > Date.now()),
+        open: !!submit && !hidden(submit) && !closedLots.has(listingId),
       };
     };
 
     const statusEl = h('span', { class: 'status' });
-    const clockEl = h('span', { class: 'clock' });
+    const clockEl = h('span', { class: 'clock', 'data-lid': listingId });
     const priceEl = h('div', { class: 'big' });
     const priceLabel = h('div', { class: 'label' }, 'Current bid');
     const historyHref = abs($('a.bid-history, a[href*="/Listing/History/"]')?.getAttribute('href'));
@@ -963,8 +1001,10 @@
     function render() {
       if (pending?.btn === quick && !busy() && state.min && num(state.min) !== pending.amount) clearPending();
       statusEl.textContent = state.status || (state.open ? 'Active' : 'Closed');
-      if (isNaN(state.deadline)) clockEl.removeAttribute('data-deadline');
-      else clockEl.dataset.deadline = state.deadline;
+      if (isNaN(state.deadline)) {
+        clockEl.removeAttribute('data-deadline');
+        clockEl.textContent = state.open ? '' : 'Ended';
+      } else clockEl.dataset.deadline = state.deadline;
       priceEl.textContent = money(state.price) || '—';
       priceLabel.textContent = state.open ? (state.bids && state.bids !== '0' ? 'Current bid' : 'Starting bid') : state.sold ? 'Sold for' : 'Final price';
       bidsEl.textContent = bidsLabel(state.bids);
