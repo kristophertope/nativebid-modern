@@ -565,7 +565,6 @@
         label: text(visible('.event-row__time-label > div')),
         deadline: timed ? clock(timed.getAttribute('data-action-time')) : NaN,
         date: dated ? fmtDate(clock(dated.getAttribute('data-initial-dttm'))) : '',
-        lots: $$('.event-row__thumbnails a', ev).map(l => ({ href: abs(l.getAttribute('href'), base), src: abs(srcOf($('img', l)), base) })),
       };
     }).filter(Boolean);
   }
@@ -579,7 +578,6 @@
           !isNaN(ev.deadline) ? h('span', { class: 'clock', 'data-deadline': ev.deadline }) : (ev.label || ev.date) && h('span', { class: 'muted' }, [ev.label, ev.date].filter(Boolean).join(' '))),
         h('a', { href: ev.href }, h('h2', null, ev.title)),
         ev.summary && h('div', { class: 'muted' }, ev.summary),
-        ev.lots.length > 0 && h('div', { class: 'strip' }, ev.lots.map(l => h('a', { href: l.href }, img(l.src)))),
         h('a', { class: 'view-lots', href: ev.href }, 'View all lots →')));
   }
 

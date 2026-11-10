@@ -208,9 +208,6 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .event h2 { margin: 6px 0 4px; font-size: 21px; letter-spacing: -0.02em; }
 .event-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .status-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.strip { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: thin; }
-.strip a { flex: 0 0 92px; aspect-ratio: 1; overflow: hidden; background: var(--well); border-radius: 10px; scroll-snap-align: start; }
-.strip img { width: 100%; height: 100%; object-fit: cover; }
 .view-lots { align-self: flex-start; color: var(--accent); font-weight: 600; }
 
 .detail { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: 44px; align-items: start; }
