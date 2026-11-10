@@ -9,17 +9,23 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "permissions": ["declarativeNetRequest"],
+  "host_permissions": ["https://www.nativebid.com/*", "https://nativebid.com/*"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "trackers",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
   "content_scripts": [
     {
       "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"],
-      "js": ["boot.js"],
+      "js": ["boot.js", "styles.js", "app.js"],
       "css": ["boot.css"],
       "run_at": "document_start"
-    },
-    {
-      "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"],
-      "js": ["styles.js", "app.js"],
-      "run_at": "document_end"
     },
     {
       "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"],

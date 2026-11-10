@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "requestDomains": [
+        "googletagmanager.com",
+        "google-analytics.com",
+        "facebook.net",
+        "onesignal.com",
+        "chimpstatic.com",
+        "mailchimp.com",
+        "cloudflareinsights.com"
+      ],
+      "initiatorDomains": [
+        "nativebid.com"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||facebook.com/tr",
+      "initiatorDomains": [
+        "nativebid.com"
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "cache-control",
+          "operation": "set",
+          "value": "private, no-cache"
+        },
+        {
+          "header": "permissions-policy",
+          "operation": "set",
+          "value": "unload=()"
+        }
+      ]
+    },
+    "condition": {
+      "regexFilter": "^https://(www\\.)?nativebid\\.com/(\\?|$|browse|search|event/details/)",
+      "isUrlFilterCaseSensitive": false,
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  }
+]

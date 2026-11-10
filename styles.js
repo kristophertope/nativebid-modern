@@ -195,6 +195,13 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .chip { padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .chip.strong { border-color: transparent; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .card.ended .well { opacity: .5; }
+.grid.skeletons { margin-top: 32px; }
+.skel { pointer-events: none; animation: pulse 1.1s ease-in-out infinite alternate; }
+.skel .well, .skel .line { background: var(--line); }
+.skel .line { height: 14px; border-radius: 7px; }
+.skel .line.short { width: 40%; height: 18px; }
+@keyframes pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 .feed-status { padding: 48px 0; text-align: center; color: var(--muted); }
 .feed-status button { margin-left: 8px; }
 
@@ -319,6 +326,7 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 }
 @media (max-width: 560px) {
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; }
+  .grid.skeletons { margin-top: 22px; }
   .price { font-size: 16px; }
   .title { font-size: 14px; }
 }

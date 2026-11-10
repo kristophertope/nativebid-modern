@@ -14,4 +14,14 @@
   };
   mirror();
   setInterval(mirror, 250);
+  const hub = () => window.jQuery?.connection?.hub;
+  addEventListener('pagehide', () => { try { hub()?.stop(false, false); } catch {} });
+  addEventListener('pageshow', e => {
+    if (!e.persisted || window.rwx_SignalRDisabled) return;
+    try {
+      window.rwx_CurrentReConnectRetries = 0;
+      window.rwx_ReConnectRetriesDisabled = false;
+      hub()?.start();
+    } catch {}
+  });
 })();

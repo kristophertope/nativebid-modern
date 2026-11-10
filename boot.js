@@ -3,16 +3,31 @@
   const route = path === '/' || /^\/(?:browse(?:\/|$)|search(?:\/|$)|listing\/?$|listing\/details\/|event\/details\/|event\/lotdetails\/|account\/bidding\/(?:watching|active|won|lost)\/?$|account\/invoice\/purchases\/?$|page\/schedule-pick-up\/?$)/i.test(path);
   let off = false;
   try { off = localStorage.getItem('nbx-off') === '1'; } catch {}
-  globalThis.nbxBoot = { route, off };
+  const waiting = [];
+  let ready = false;
+  const fire = () => {
+    if (ready) return;
+    ready = true;
+    waiting.splice(0).forEach(fn => fn());
+  };
+  globalThis.nbxBoot = { route, off, ready: fn => (ready ? fn() : waiting.push(fn)) };
+  document.addEventListener('DOMContentLoaded', fire, { once: true });
   if (!off && /^\/account(?:\/summary)?\/?$/i.test(path)) location.replace('/Account/Bidding/Active');
   if (route && !off) {
     document.documentElement.classList.add('nbx');
+    const pre = document.createElement('link');
+    pre.rel = 'preconnect';
+    pre.href = 'https://nativebid1.blob.core.windows.net';
+    (document.head || document.documentElement).append(pre);
     const hold = el => {
       if (el.hasAttribute('src')) { el.setAttribute('data-nbx-src', el.getAttribute('src')); el.removeAttribute('src'); }
       if (el.hasAttribute('srcset')) { el.setAttribute('data-nbx-srcset', el.getAttribute('srcset')); el.removeAttribute('srcset'); }
     };
     const watch = new MutationObserver(ms => {
-      for (const m of ms) for (const n of m.addedNodes) if (n.tagName === 'IMG' || n.tagName === 'SOURCE') hold(n);
+      for (const m of ms) for (const n of m.addedNodes) {
+        if (n.tagName === 'IMG' || n.tagName === 'SOURCE') hold(n);
+        else if (!ready && n.tagName === 'SCRIPT' && n.hasAttribute('src') && document.getElementById('Time')) fire();
+      }
     });
     watch.observe(document, { childList: true, subtree: true });
     globalThis.nbxBoot.restore = () => {

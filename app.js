@@ -1,4 +1,4 @@
-(() => {
+(globalThis.nbxBoot?.ready || (fn => fn()))(() => {
   const boot = globalThis.nbxBoot || {};
   const html = document.documentElement;
 
@@ -153,6 +153,7 @@
     }
     load();
     addEventListener('storage', e => { if (e.key === key) load(); });
+    addEventListener('pageshow', e => { if (e.persisted) load(); });
     return {
       get list() { return list; },
       add: s => set([...list, s]),
@@ -308,6 +309,48 @@
         it.type && it.type !== 'Auction' && h('span', { class: 'chip' }, it.type)));
   }
 
+  function skeletonCard() {
+    return h('div', { class: 'card skel' },
+      h('div', { class: 'well' }),
+      h('div', { class: 'line short' }),
+      h('div', { class: 'line' }));
+  }
+
+  function speculate() {
+    if (!HTMLScriptElement.supports?.('speculationrules')) return;
+    const safe = /^\/(?:$|browse|search|event\/details\/|event\/lotdetails\/|listing\/details\/)/i;
+    let urls = [];
+    let rules = null;
+    let timer = 0;
+    const target = e => {
+      const a = e.target.closest?.('a[href]');
+      if (!a) return '';
+      const u = new URL(a.href, location.href);
+      u.hash = '';
+      return u.origin === location.origin && safe.test(u.pathname) && u.href !== location.href.split('#')[0] ? u.href : '';
+    };
+    const go = url => {
+      if (!url || urls.includes(url)) return;
+      urls = [url, ...urls].slice(0, 2);
+      const el = h('script', { type: 'speculationrules' }, JSON.stringify({ prerender: [{ source: 'list', urls }] }));
+      rules?.remove();
+      (document.head || document.documentElement).append(el);
+      rules = el;
+    };
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem('nbx-recent-results') || '[]'); } catch {}
+    const here = location.href.split('#')[0];
+    const warm = [abs('/Browse'), ...recent].filter((u, i, a) => typeof u === 'string' && u !== here && a.indexOf(u) === i).slice(0, 2);
+    if (warm.length) (document.head || document.documentElement).append(h('script', { type: 'speculationrules' }, JSON.stringify({ prerender: [{ source: 'list', urls: warm, eagerness: 'immediate' }] })));
+    shadow.addEventListener('pointerover', e => {
+      clearTimeout(timer);
+      const url = target(e);
+      if (url) timer = setTimeout(() => go(url), 150);
+    });
+    shadow.addEventListener('pointerout', () => clearTimeout(timer));
+    shadow.addEventListener('pointerdown', e => go(target(e)));
+  }
+
   function nextPage(doc, base) {
     const last = $$('.pagination li', doc).pop();
     if (!last || last.classList.contains('disabled')) return '';
@@ -315,41 +358,70 @@
     return a && /»|next/i.test(text(a)) ? abs(a.getAttribute('href'), base) : '';
   }
 
-  function feed({ container, parse, render, firstDoc, empty, keep = () => true, hide }) {
+  function feed({ container, parse, render, firstDoc, empty, keep = () => true, hide, placeholder }) {
     const key = 'nbx:feed:' + location.href;
-    const seen = new Set();
     const records = [];
-    let hiddenCount = 0;
+    const byId = new Map();
     const loaded = [];
+    const inflight = new Map();
     const status = h('div', { class: 'feed-status' });
     const sentinel = h('div');
+    const skeletons = placeholder && h('div', { class: container.className + ' skeletons', 'aria-hidden': 'true' }, Array.from({ length: 8 }, placeholder));
+    let hiddenCount = 0;
     let next = '';
     let busy = false;
-    let ahead = null;
     let restoring = false;
+    let speed = 0;
+    let lastY = scrollY;
+    let lastT = performance.now();
     try { history.scrollRestoration = 'manual'; } catch {}
 
-    function add(doc, base) {
-      let stop = false;
-      for (const item of parse(doc, base)) {
-        if (!keep(item)) { stop = true; continue; }
-        if (seen.has(item.id)) continue;
-        seen.add(item.id);
-        const rec = { item, el: null };
-        records.push(rec);
-        if (hide?.(item)) hiddenCount++;
-        else container.append(build(rec));
-      }
-      next = stop ? '' : nextPage(doc, base);
-      tick();
-    }
+    const canonical = url => {
+      const u = new URL(url, location.href);
+      u.hash = '';
+      u.searchParams.sort();
+      return u.href;
+    };
+    const pageAfter = (url, k) => {
+      const u = new URL(url);
+      const n = +u.searchParams.get('page');
+      if (!n) return '';
+      u.searchParams.set('page', n + k);
+      return canonical(u.href);
+    };
+    const depth = () => (speed > 2.5 ? 3 : 2);
+    const same = (a, b) => Object.keys(b).every(k => (k === 'deadline' ? (isNaN(a[k]) && isNaN(b[k])) || Math.abs(a[k] - b[k]) < 5000 : a[k] === b[k]));
+    const near = () => sentinel.getBoundingClientRect().top < innerHeight * 4 + speed * 1500;
 
-    function build(rec) {
+    function build(rec, eager) {
       if (!rec.el) {
         rec.el = render(rec.item);
         rec.el.dataset.feedId = rec.item.id;
+        if (eager) for (const im of rec.el.querySelectorAll('img')) { im.loading = 'eager'; im.fetchPriority = 'low'; }
       }
       return rec.el;
+    }
+
+    function addItems(entries, eager) {
+      for (const { item, page } of entries) {
+        if (byId.has(item.id)) continue;
+        const rec = { item, el: null, page };
+        records.push(rec);
+        byId.set(item.id, rec);
+        if (hide?.(item)) hiddenCount++;
+        else container.append(build(rec, eager));
+      }
+      tick();
+    }
+
+    function add(doc, base, eager) {
+      const items = parse(doc, base);
+      const kept = items.filter(keep);
+      const page = canonical(base);
+      addItems(kept.map(item => ({ item, page })), eager);
+      const n = kept.length < items.length ? '' : nextPage(doc, base);
+      next = n && canonical(n);
+      if (!next) stopAll();
     }
 
     function refilter() {
@@ -359,7 +431,7 @@
         const off = hide(rec.item);
         if (off) hiddenCount++;
         else if (!rec.el) {
-          build(rec);
+          build(rec, true);
           if (prev) prev.after(rec.el);
           else container.prepend(rec.el);
         }
@@ -373,26 +445,45 @@
     }
 
     function fetchPage(url) {
-      return fetch(url, { credentials: 'include' }).then(res => {
-        if (!res.ok) throw new Error(res.status);
-        return res.text();
-      });
+      let entry = inflight.get(url);
+      if (!entry) {
+        const ctrl = new AbortController();
+        const p = fetch(url, { credentials: 'include', signal: ctrl.signal }).then(res => {
+          if (!res.ok) throw new Error(res.status);
+          return res.text();
+        });
+        entry = { p, ctrl };
+        inflight.set(url, entry);
+        p.catch(() => { if (inflight.get(url) === entry) inflight.delete(url); });
+      }
+      return entry.p;
+    }
+
+    function stopAll() {
+      for (const { ctrl } of inflight.values()) ctrl.abort();
+      inflight.clear();
     }
 
     function prefetch() {
-      if (!next || ahead?.url === next) return;
-      const p = fetchPage(next);
-      p.catch(() => { if (ahead?.p === p) ahead = null; });
-      ahead = { url: next, p };
+      if (!next || restoring) return;
+      fetchPage(next);
+      for (let k = 1; k < depth(); k++) {
+        const u = pageAfter(next, k);
+        if (u) fetchPage(u);
+      }
+    }
+
+    function snapshot() {
+      const top = shadowTop();
+      const anchor = Array.from(container.children).find(el => el.getBoundingClientRect().bottom > top);
+      const state = { y: scrollY, next, pages: loaded, items: records.map(r => ({ page: r.page, item: r.item })) };
+      if (anchor) Object.assign(state, { anchor: anchor.dataset.feedId, offset: anchor.getBoundingClientRect().top });
+      return state;
     }
 
     function save() {
       if (restoring) return;
-      const top = shadowTop();
-      const anchor = Array.from(container.children).find(el => el.getBoundingClientRect().bottom > top);
-      const state = { pages: loaded, y: scrollY };
-      if (anchor) Object.assign(state, { anchor: anchor.dataset.feedId, offset: anchor.getBoundingClientRect().top });
-      try { sessionStorage.setItem(key, JSON.stringify(state)); } catch {}
+      try { sessionStorage.setItem(key, JSON.stringify(snapshot())); } catch {}
     }
 
     function shadowTop() {
@@ -400,81 +491,142 @@
     }
 
     function jump(state) {
-      const el = state.anchor && Array.from(container.children).find(c => c.dataset.feedId === state.anchor);
-      if (el) scrollBy(0, el.getBoundingClientRect().top - state.offset);
+      const el = state.anchor && byId.get(state.anchor)?.el;
+      if (el && el.isConnected) scrollBy(0, el.getBoundingClientRect().top - state.offset);
       else scrollTo(0, state.y || 0);
     }
 
     function setStatus() {
       const note = hiddenCount ? ` ${hiddenCount} lot${hiddenCount === 1 ? '' : 's'} hidden by filters.` : '';
-      status.replaceChildren(busy ? 'Loading more…' : next ? '' : (seen.size > hiddenCount ? 'You’ve reached the end.' : empty) + note);
-    }
-
-    function place(html, url) {
-      add(new DOMParser().parseFromString(html, 'text/html'), url);
-      loaded.push(url);
-    }
-
-    async function load(url) {
-      const html = await (ahead?.url === url ? ahead.p : fetchPage(url));
-      ahead = null;
-      place(html, url);
+      skeletons?.classList.toggle('hidden', !next);
+      status.replaceChildren(busy ? (skeletons ? '' : 'Loading more…') : next ? '' : (records.length > hiddenCount ? 'You’ve reached the end.' : empty) + note);
     }
 
     async function more() {
       if (busy || !next) return;
       busy = true;
       setStatus();
+      const url = next;
       try {
-        await load(next);
-        save();
-        prefetch();
-      } catch {
+        const html = await fetchPage(url);
+        inflight.delete(url);
+        add(new DOMParser().parseFromString(html, 'text/html'), url, true);
+        loaded.push(url);
+      } catch (e) {
         busy = false;
+        if (e?.name === 'AbortError') { setStatus(); return; }
         status.replaceChildren('Couldn’t load more lots.', h('button', { class: 'btn', onclick: more }, 'Retry'));
         return;
       }
       busy = false;
       setStatus();
-      if (sentinel.getBoundingClientRect().top < innerHeight + 1600) more();
+      save();
+      prefetch();
+      if (near()) more();
+    }
+
+    function refreshAll() {
+      const top = shadowTop();
+      const pages = [canonical(location.href), ...loaded.filter(u => u !== canonical(location.href))];
+      const first = records.find(r => r.el?.isConnected && !r.el.classList.contains('hidden') && r.el.getBoundingClientRect().bottom > top);
+      const at = Math.max(0, pages.indexOf(first?.page));
+      refresh(pages.map((u, i) => [Math.abs(i - at) + (i < at ? 0.5 : 0), u]).sort((a, b) => a[0] - b[0]).map(x => x[1]));
+    }
+
+    async function refresh(pages) {
+      for (const url of pages) {
+        let doc;
+        try {
+          const res = await fetch(url, { credentials: 'include' });
+          if (!res.ok) continue;
+          doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        } catch { continue; }
+        let prev = null;
+        for (const item of parse(doc, url).filter(keep)) {
+          let rec = byId.get(item.id);
+          if (!rec) {
+            const at = prev ? records.indexOf(prev) + 1 : records.findIndex(r => r.page === url);
+            if (at < 0) continue;
+            rec = { item, el: null, page: url };
+            records.splice(at, 0, rec);
+            byId.set(item.id, rec);
+            prev = rec;
+            if (hide?.(item)) { hiddenCount++; continue; }
+            const before = records.slice(0, at).reverse().find(r => r.el)?.el;
+            if (before) before.after(build(rec, true));
+            else container.prepend(build(rec, true));
+            continue;
+          }
+          prev = rec;
+          if (same(rec.item, item)) continue;
+          rec.item = item;
+          if (!rec.el) continue;
+          const old = rec.el;
+          rec.el = null;
+          build(rec, false).classList.toggle('hidden', old.classList.contains('hidden'));
+          old.replaceWith(rec.el);
+        }
+        tick();
+      }
+      setStatus();
+      save();
     }
 
     if (hide) filters.on(refilter);
-    add(firstDoc, location.href);
-    $$('img', container).slice(0, 8).forEach(el => { el.loading = 'eager'; el.fetchPriority = 'high'; });
-    setStatus();
+    add(firstDoc, location.href, true);
+    $$('img', container).slice(0, 8).forEach(el => { el.fetchPriority = 'high'; });
 
     const nav = performance.getEntriesByType('navigation')[0];
     let saved = null;
-    try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch {}
-    if (saved && nav?.type === 'back_forward' && saved.pages?.length) {
-      (async () => {
-        busy = true;
-        restoring = true;
-        setStatus();
-        const pages = await Promise.allSettled(saved.pages.map(fetchPage));
-        for (const [i, r] of pages.entries()) {
-          if (r.status !== 'fulfilled') break;
-          place(r.value, saved.pages[i]);
-        }
-        busy = false;
-        setStatus();
+    try { saved = JSON.parse(sessionStorage.getItem(key) || 'null', (k, v) => (k === 'deadline' && v === null ? NaN : v)); } catch {}
+    if (saved && nav?.type === 'back_forward' && saved.items?.[0]?.item) {
+      restoring = true;
+      addItems(saved.items, false);
+      next = saved.next || '';
+      loaded.push(...(saved.pages || []));
+      setStatus();
+      requestAnimationFrame(() => {
+        jump(saved);
         requestAnimationFrame(() => {
           jump(saved);
-          requestAnimationFrame(() => { jump(saved); restoring = false; prefetch(); });
+          restoring = false;
+          prefetch();
+          setTimeout(refreshAll, 1500);
         });
-      })();
+      });
     } else {
       try { sessionStorage.removeItem(key); } catch {}
-      prefetch();
+      setStatus();
+      if (document.prerendering) {
+        document.addEventListener('prerenderingchange', () => {
+          prefetch();
+          if (performance.getEntriesByType('navigation')[0]?.activationStart > 15000) refreshAll();
+        }, { once: true });
+      } else prefetch();
     }
 
     let t;
-    addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(save, 200); }, { passive: true });
-    addEventListener('pagehide', save);
-    new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) more(); }, { rootMargin: '0px 0px 1600px 0px' }).observe(sentinel);
+    let frame = 0;
+    addEventListener('scroll', () => {
+      const now = performance.now();
+      speed = speed * 0.6 + (Math.abs(scrollY - lastY) / Math.max(16, now - lastT)) * 0.4;
+      lastY = scrollY;
+      lastT = now;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; prefetch(); if (near()) more(); });
+      clearTimeout(t);
+      t = setTimeout(() => { speed = 0; save(); }, 200);
+    }, { passive: true });
+    addEventListener('pagehide', () => { save(); stopAll(); });
+    addEventListener('pageshow', e => {
+      if (!e.persisted) return;
+      tick();
+      prefetch();
+      if (near()) more();
+      refreshAll();
+    });
+    new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) more(); }, { rootMargin: `0px 0px ${innerHeight * 4}px 0px` }).observe(sentinel);
 
-    return [sentinel, status];
+    return [sentinel, skeletons, status];
   }
 
   function filterControl() {
@@ -509,6 +661,15 @@
 
   function resultsPage() {
     const url = new URL(location.href);
+    const remember = () => {
+      try {
+        const here = location.href.split('#')[0];
+        const recent = JSON.parse(localStorage.getItem('nbx-recent-results') || '[]').filter(u => u !== here);
+        localStorage.setItem('nbx-recent-results', JSON.stringify([here, ...recent].slice(0, 3)));
+      } catch {}
+    };
+    if (document.prerendering) document.addEventListener('prerenderingchange', remember, { once: true });
+    else remember();
     const q = url.searchParams.get('FullTextQuery');
     const eventH1 = $('h1.event-title');
     const crumb = text($$('.breadcrumb li').pop());
@@ -541,7 +702,7 @@
           (eventStatus || lede) && h('div', { class: 'lede' }, [eventStatus, lede].filter(Boolean).join(' · '))),
         tools),
       grid,
-      feed({ container: grid, parse: parseListings, render: listingCard, firstDoc: document, empty: 'No lots found.', hide: it => filters.test(it.title) }));
+      feed({ container: grid, parse: parseListings, render: listingCard, firstDoc: document, empty: 'No lots found.', hide: it => filters.test(it.title), placeholder: skeletonCard }));
   }
 
   function parseEvents(doc, base) {
@@ -1261,6 +1422,7 @@
       h('button', { type: 'button', onclick: () => { try { localStorage.setItem('nbx-off', '1'); } catch {} location.reload(); } }, 'Switch to the classic NativeBid layout'));
     shadow.append(header(), main, footer);
     document.body.append(host);
+    speculate();
     const icon = globalThis.chrome?.runtime?.getURL?.('icons/favicon.svg');
     if (icon) {
       $$('link[rel~="icon"]').forEach(l => l.remove());
@@ -1280,4 +1442,4 @@
     html.classList.remove('nbx');
     globalThis.nbxBoot?.restore?.();
   }
-})();
+});
