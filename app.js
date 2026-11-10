@@ -133,6 +133,35 @@
   const closedLots = new Set();
   const checking = new Map();
 
+  const filters = (() => {
+    const key = 'nbx-filters';
+    const subs = new Set();
+    let list = [];
+    let re = null;
+    const norm = s => String(s).toLowerCase().replace(/\s+/g, ' ').trim();
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+    function set(next, persist = true) {
+      list = [...new Set(next.map(norm).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      re = list.length ? new RegExp(`(?<![a-z0-9])(?:${list.map(esc).join('|')})s?(?![a-z0-9])`, 'i') : null;
+      if (persist) try { localStorage.setItem(key, JSON.stringify(list)); } catch {}
+      subs.forEach(fn => fn());
+    }
+    function load() {
+      let saved = [];
+      try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+      set(Array.isArray(saved) ? saved : [], false);
+    }
+    load();
+    addEventListener('storage', e => { if (e.key === key) load(); });
+    return {
+      get list() { return list; },
+      add: s => set([...list, s]),
+      remove: s => set(list.filter(x => x !== s)),
+      test: s => !!re && re.test(s),
+      on: fn => subs.add(fn),
+    };
+  })();
+
   function onScreen(el) {
     const card = el.closest('.card');
     if (!card) return true;
@@ -286,9 +315,11 @@
     return a && /»|next/i.test(text(a)) ? abs(a.getAttribute('href'), base) : '';
   }
 
-  function feed({ container, parse, render, firstDoc, empty, keep = () => true }) {
+  function feed({ container, parse, render, firstDoc, empty, keep = () => true, hide }) {
     const key = 'nbx:feed:' + location.href;
     const seen = new Set();
+    const records = [];
+    let hiddenCount = 0;
     const loaded = [];
     const status = h('div', { class: 'feed-status' });
     const sentinel = h('div');
@@ -304,11 +335,40 @@
         if (!keep(item)) { stop = true; continue; }
         if (seen.has(item.id)) continue;
         seen.add(item.id);
-        const el = render(item);
-        el.dataset.feedId = item.id;
-        container.append(el);
+        const rec = { item, el: null };
+        records.push(rec);
+        if (hide?.(item)) hiddenCount++;
+        else container.append(build(rec));
       }
       next = stop ? '' : nextPage(doc, base);
+      tick();
+    }
+
+    function build(rec) {
+      if (!rec.el) {
+        rec.el = render(rec.item);
+        rec.el.dataset.feedId = rec.item.id;
+      }
+      return rec.el;
+    }
+
+    function refilter() {
+      let prev = null;
+      hiddenCount = 0;
+      for (const rec of records) {
+        const off = hide(rec.item);
+        if (off) hiddenCount++;
+        else if (!rec.el) {
+          build(rec);
+          if (prev) prev.after(rec.el);
+          else container.prepend(rec.el);
+        }
+        if (rec.el) {
+          rec.el.classList.toggle('hidden', off);
+          prev = rec.el;
+        }
+      }
+      setStatus();
       tick();
     }
 
@@ -346,7 +406,8 @@
     }
 
     function setStatus() {
-      status.replaceChildren(busy ? 'Loading more…' : next ? '' : seen.size ? 'You’ve reached the end.' : empty);
+      const note = hiddenCount ? ` ${hiddenCount} lot${hiddenCount === 1 ? '' : 's'} hidden by filters.` : '';
+      status.replaceChildren(busy ? 'Loading more…' : next ? '' : (seen.size > hiddenCount ? 'You’ve reached the end.' : empty) + note);
     }
 
     function place(html, url) {
@@ -378,6 +439,7 @@
       if (sentinel.getBoundingClientRect().top < innerHeight + 1600) more();
     }
 
+    if (hide) filters.on(refilter);
     add(firstDoc, location.href);
     $$('img', container).slice(0, 8).forEach(el => { el.loading = 'eager'; el.fetchPriority = 'high'; });
     setStatus();
@@ -415,6 +477,36 @@
     return [sentinel, status];
   }
 
+  function filterControl() {
+    const input = h('input', { type: 'text', placeholder: 'Hide lots containing…', 'aria-label': 'Add filter', autocomplete: 'off', enterkeyhint: 'done' });
+    const list = h('ul', { class: 'filter-list' });
+    const count = h('span', { class: 'filter-count' });
+    const dialog = h('dialog', { class: 'filters', 'aria-label': 'Filters', onclick: e => { if (e.target === dialog) dialog.close(); } },
+      h('div', { class: 'filter-box' },
+        h('form', { class: 'filter-add', onsubmit: e => { e.preventDefault(); filters.add(input.value); input.value = ''; } },
+          input,
+          h('button', { class: 'btn primary', type: 'submit' }, 'Add')),
+        list,
+        h('div', { class: 'filter-foot' },
+          h('button', { class: 'btn', type: 'button', onclick: () => dialog.close() }, 'Done'))));
+
+    function sync() {
+      count.textContent = filters.list.length || '';
+      list.replaceChildren(...(filters.list.length
+        ? filters.list.map(f => h('li', null,
+          h('span', null, f),
+          h('button', { type: 'button', class: 'filter-del', 'aria-label': `Remove ${f}`, onclick: () => { filters.remove(f); input.focus(); } }, svg('M6 6l12 12M18 6L6 18'))))
+        : [h('li', { class: 'filter-empty muted' }, 'Lots with a filtered word or phrase in the title are hidden.')]));
+    }
+    sync();
+    filters.on(sync);
+
+    return [
+      h('button', { type: 'button', class: 'filter-btn', onclick: () => { dialog.showModal(); input.focus(); } }, svg('M3 5h18l-7 8v6l-4 2v-8z'), 'Filters', count),
+      dialog,
+    ];
+  }
+
   function resultsPage() {
     const url = new URL(location.href);
     const q = url.searchParams.get('FullTextQuery');
@@ -424,7 +516,7 @@
     const eventStatus = eventH1 ? text($('.label', eventH1)) : '';
     const lede = eventH1 ? text($('.EventToggleWrapper p')) : '';
 
-    const tools = h('div', { class: 'tools' });
+    const tools = h('div', { class: 'tools' }, filterControl());
     const statusVal = $('#StatusFilter')?.value;
     const goWith = (k, v) => { url.searchParams.set(k, v); url.searchParams.delete('page'); location.href = url.href; };
     if (statusVal != null) {
@@ -449,7 +541,7 @@
           (eventStatus || lede) && h('div', { class: 'lede' }, [eventStatus, lede].filter(Boolean).join(' · '))),
         tools),
       grid,
-      feed({ container: grid, parse: parseListings, render: listingCard, firstDoc: document, empty: 'No lots found.' }));
+      feed({ container: grid, parse: parseListings, render: listingCard, firstDoc: document, empty: 'No lots found.', hide: it => filters.test(it.title) }));
   }
 
   function parseEvents(doc, base) {

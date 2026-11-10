@@ -125,6 +125,27 @@ h1 { margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; ov
 .seg { position: relative; display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
 .seg a, .seg button { flex: none; white-space: nowrap; padding: 6px 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; font-weight: 500; }
 .seg .on { background: var(--ink); color: var(--bg); }
+.filter-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-weight: 500; cursor: pointer; }
+.filter-btn svg { width: 16px; height: 16px; color: var(--muted); }
+.filter-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.filter-count:empty { display: none; }
+.filters { width: min(440px, calc(100vw - 32px)); max-height: min(70vh, 640px); padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, .24); }
+.filters[open] { display: flex; }
+.filters::backdrop { background: rgba(0, 0, 0, .4); }
+.filter-box { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.filter-add { display: flex; gap: 8px; margin: 0; }
+.filter-add input { flex: 1; min-width: 0; height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); outline: none; font-size: 16px; }
+.filter-add input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.filter-add .btn, .filter-foot .btn { height: 44px; }
+.filter-list { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+.filter-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 2px; border-bottom: 1px solid var(--line); }
+.filter-list li:last-child { border-bottom: 0; }
+.filter-list li span { flex: 1; overflow-wrap: anywhere; }
+.filter-list .filter-empty { padding: 8px 2px; }
+.filter-del { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+.filter-del:hover { background: var(--bg); color: var(--warn); }
+.filter-del svg { width: 16px; height: 16px; }
+.filter-foot { display: flex; justify-content: flex-end; }
 select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 32px 20px; }
