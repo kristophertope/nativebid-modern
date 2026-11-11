@@ -1,4 +1,45 @@
 (() => {
+  const style = document.createElement('style');
+  style.textContent = `
+html.nbx body > :not(#nbx-root) {
+  display: none !important;
+}
+
+html.nbx,
+html.nbx body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #f7f7f5 !important;
+}
+
+html.nbx body.modal-open {
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html.nbx,
+  html.nbx body {
+    background: #111113 !important;
+  }
+}
+
+#nbx-classic-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #18181b;
+  color: #fff;
+  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+`;
+  document.documentElement.append(style);
   const path = location.pathname;
   const route = path === '/' || /^\/(?:browse(?:\/|$)|search(?:\/|$)|listing\/?$|listing\/details\/|event\/details\/|event\/lotdetails\/|account\/bidding\/(?:watching|active|won|lost)\/?$|account\/invoice\/purchases\/?$|page\/schedule-pick-up\/?$)/i.test(path);
   let off = false;

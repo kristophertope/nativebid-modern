@@ -24,7 +24,6 @@
     {
       "matches": ["https://www.nativebid.com/*", "https://nativebid.com/*"],
       "js": ["boot.js", "styles.js", "app.js"],
-      "css": ["boot.css"],
       "run_at": "document_start"
     },
     {
