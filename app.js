@@ -585,15 +585,41 @@
       next = saved.next || '';
       loaded.push(...(saved.pages || []));
       setStatus();
-      requestAnimationFrame(() => {
-        jump(saved);
+      const finish = () => {
+        restoring = false;
+        prefetch();
+        setTimeout(refreshAll, 1500);
+      };
+      if (typeof GestureEvent !== 'undefined') {
+        const started = performance.now();
+        let touched = false;
+        let calm = 0;
+        let first = true;
+        const stop = () => { touched = true; };
+        const inputs = ['touchstart', 'wheel', 'keydown', 'pointerdown'];
+        inputs.forEach(ev => addEventListener(ev, stop, { passive: true }));
+        const hold = () => {
+          const el = saved.anchor && byId.get(saved.anchor)?.el;
+          const drift = el?.isConnected && el.getClientRects().length ? el.getBoundingClientRect().top - saved.offset : 0;
+          const y = scrollY;
+          if (!touched && (first || Math.abs(drift) > 1)) jump(saved);
+          calm = scrollY === y && !first ? calm + 1 : 0;
+          first = false;
+          const settled = document.readyState === 'complete' && calm > 30;
+          if (!touched && !settled && performance.now() - started < 3000) return requestAnimationFrame(hold);
+          inputs.forEach(ev => removeEventListener(ev, stop));
+          finish();
+        };
+        requestAnimationFrame(hold);
+      } else {
         requestAnimationFrame(() => {
           jump(saved);
-          restoring = false;
-          prefetch();
-          setTimeout(refreshAll, 1500);
+          requestAnimationFrame(() => {
+            jump(saved);
+            finish();
+          });
         });
-      });
+      }
     } else {
       try { sessionStorage.removeItem(key); } catch {}
       setStatus();
