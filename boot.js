@@ -41,7 +41,7 @@ html.nbx body.modal-open {
 `;
   document.documentElement.append(style);
   const path = location.pathname;
-  const route = path === '/' || /^\/(?:browse(?:\/|$)|search(?:\/|$)|listing\/?$|listing\/details\/|event\/details\/|event\/lotdetails\/|account\/bidding\/(?:watching|active|won|lost)\/?$|account\/invoice\/purchases\/?$|page\/schedule-pick-up\/?$)/i.test(path);
+  const route = path === '/' || /^\/(?:browse(?:\/|$)|search(?:\/|$)|listing\/?$|listing\/details\/|event\/details\/|event\/lotdetails\/|account\/bidding\/(?:watching|active|won|lost)\/?$|account\/invoice\/purchases\/?$|page\/schedule-pick-up\/?$|sniper\/?$)/i.test(path);
   let off = false;
   try { off = localStorage.getItem('nbx-off') === '1'; } catch {}
   const waiting = [];

@@ -129,6 +129,9 @@
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.append(h('style', null, globalThis.NBX_CSS || ''));
 
+  const sniperKey = 'nbx-sniper-bot';
+  const sniperBot = () => { try { return localStorage.getItem(sniperKey) || ''; } catch { return ''; } };
+
   const extendedLots = new Map();
   const closedLots = new Set();
   const checking = new Map();
@@ -1142,7 +1145,13 @@
         h('label', { class: 'money' }, '$', input), maxBtn),
       feeEl,
       err,
-      h('div', { class: 'note' }, 'Proxy bidding: NativeBid bids for you up to your max. Tap once to see the total with fees, then tap again to place the bid.'));
+      h('div', { class: 'note' }, 'Proxy bidding: NativeBid bids for you up to your max. Tap once to see the total with fees, then tap again to place the bid.'),
+      sniperBot() && listingId && h('a', {
+        class: 'btn snipe',
+        href: `https://t.me/${sniperBot()}?text=${encodeURIComponent(`/snipe ${listingId} `)}`,
+        target: '_blank',
+        rel: 'noopener',
+      }, 'Snipe', svg('M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3')));
     const closedEl = h('div', { class: 'closed hidden' }, 'Bidding is closed');
 
     let state = read();
@@ -1386,6 +1395,34 @@
           desc && h('section', { class: 'section' }, h('h2', null, 'Description'), desc))));
   }
 
+  function sniperPage() {
+    document.title = 'Sniper · NativeBid';
+    const input = h('input', { type: 'text', value: sniperBot(), placeholder: 'MySniperBot', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', 'aria-label': 'Bot username' });
+    const status = h('div', { class: 'note' });
+    const show = () => {
+      const bot = sniperBot();
+      status.replaceChildren(bot ? ['Lot pages show a Snipe button that opens ', h('a', { class: 'link', href: `https://t.me/${bot}`, target: '_blank', rel: 'noopener' }, `@${bot}`), ' in Telegram.'] : 'Not set up. Lot pages won’t show a Snipe button.');
+    };
+    const save = () => {
+      const bot = input.value.trim().replace(/^(?:https?:\/\/)?(?:t\.me\/|telegram\.me\/)?@?/i, '').replace(/[/?#].*$/, '');
+      if (bot && !/^[A-Za-z0-9_]{5,32}$/.test(bot)) { status.replaceChildren(h('span', { class: 'err' }, 'That doesn’t look like a Telegram username.')); return; }
+      try { bot ? localStorage.setItem(sniperKey, bot) : localStorage.removeItem(sniperKey); } catch {}
+      input.value = bot;
+      show();
+    };
+    show();
+    return h('main', { class: 'page' },
+      h('div', { class: 'head' },
+        h('div', null,
+          h('h1', null, 'NativeBid Sniper'),
+          h('div', { class: 'lede' }, 'Only useful if you run your own ', h('a', { class: 'link', href: 'https://github.com/kristophertope/nativebid-sniper', target: '_blank', rel: 'noopener' }, 'NativeBid Sniper'), ' with a Telegram bot. Enter that bot’s username to add a Snipe button to lot pages.'))),
+      h('div', { class: 'sniper' },
+        h('form', { class: 'filter-add', onsubmit: e => { e.preventDefault(); save(); } },
+          input,
+          h('button', { class: 'btn primary', type: 'submit' }, 'Save')),
+        status));
+  }
+
   function missingLotPage() {
     const stray = Array.from(document.body.childNodes).filter(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
     const msg = text($$('main .alert, .validation-summary-errors, .alert').find(el => !hidden(el))) || stray.map(n => n.textContent.trim()).join(' ');
@@ -1435,7 +1472,8 @@
 
   try {
     let main;
-    if ($('h3.detail__title')) main = detailPage();
+    if (/^\/sniper\/?$/i.test(location.pathname)) main = sniperPage();
+    else if ($('h3.detail__title')) main = detailPage();
     else if (/^\/(listing\/details|event\/lotdetails)\//i.test(location.pathname)) main = missingLotPage();
     else if (/^\/account\/bidding\//i.test(location.pathname)) main = bidsPage();
     else if (/^\/account\/invoice\/purchases/i.test(location.pathname)) main = invoicesPage();

@@ -294,6 +294,9 @@ select { height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid 
 .err { color: var(--warn); font-size: 13px; }
 .err:empty { display: none; }
 .note { color: var(--muted); font-size: 13px; }
+.snipe { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink); text-decoration: none; }
+.snipe svg { width: 16px; height: 16px; color: var(--muted); }
+.sniper { display: grid; gap: 10px; max-width: 480px; }
 .closed { padding: 14px; border-radius: 12px; background: var(--bg); color: var(--muted); text-align: center; font-weight: 600; }
 .section { margin-top: 32px; }
 .section h2 { margin: 0 0 12px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
