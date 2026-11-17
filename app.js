@@ -699,6 +699,26 @@
     };
     if (document.prerendering) document.addEventListener('prerenderingchange', remember, { once: true });
     else remember();
+    let pageTarget = null;
+    let pageTimer;
+    addEventListener('keydown', e => {
+      const dir = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const t = e.composedPath()[0];
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      const header = shadow.querySelector('header.top')?.getBoundingClientRect().height || 0;
+      const gap = parseFloat(getComputedStyle(grid).rowGap) || 0;
+      const rows = [...new Set([...grid.children].map(c => Math.round(c.getBoundingClientRect().top + scrollY - header - gap / 2)))].sort((a, b) => a - b);
+      const step = rows.length > 1 ? rows[1] - rows[0] : innerHeight;
+      const max = document.documentElement.scrollHeight - innerHeight;
+      const from = pageTarget != null && Math.abs(pageTarget - scrollY) < step * 2 ? pageTarget : scrollY;
+      const snap = dir > 0 ? rows.find(r => r > from + 1) : rows.findLast(r => r < from - 1);
+      pageTarget = Math.max(0, Math.min(max, snap ?? (dir > 0 ? from + step : 0)));
+      scrollTo({ top: pageTarget, behavior: 'smooth' });
+      clearTimeout(pageTimer);
+      pageTimer = setTimeout(() => { pageTarget = null; }, 600);
+    });
     const q = url.searchParams.get('FullTextQuery');
     const eventH1 = $('h1.event-title');
     const crumb = text($$('.breadcrumb li').pop());
